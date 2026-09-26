@@ -1,0 +1,24 @@
+services:
+
+  backend:
+    build:
+      context: ./backend/kitchenOS_Scada.Api
+      dockerfile: Dockerfile
+      target: development
+
+    container_name: kitchen-os-scada-api
+
+    working_dir: /app
+
+    volumes:
+      - ./backend/kitchenOS_Scada.Api:/app
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+
+    restart: unless-stopped
