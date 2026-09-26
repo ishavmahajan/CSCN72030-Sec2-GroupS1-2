@@ -87,7 +87,7 @@ docker run --rm hello-world
 Clone the repository and start the development stack:
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:ishavmahajan/CSCN72030-Sec2-GroupS1-2.git
 cd kitchenOS
 make up
 ```
