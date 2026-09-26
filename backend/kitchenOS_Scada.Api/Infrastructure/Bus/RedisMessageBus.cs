@@ -1,7 +1,7 @@
 using System.Text.Json;
 using StackExchange.Redis;
 
-namespace kitchenOS_Scada.Api.Infrastructure.Messaging;
+namespace kitchenOS_Scada.Api.Infrastructure.Bus;
 
 
 public class RedisMessageBus : IMessageBus

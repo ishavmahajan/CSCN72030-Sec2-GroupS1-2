@@ -97,7 +97,7 @@ The first run builds the development image and restores NuGet packages, so it ta
 Check that it responds:
 
 ```bash
-curl http://localhost:8080/weatherforecast
+curl http://localhost:8080/health
 ```
 
 Stop the stack with `Ctrl+C`, or from another terminal:
