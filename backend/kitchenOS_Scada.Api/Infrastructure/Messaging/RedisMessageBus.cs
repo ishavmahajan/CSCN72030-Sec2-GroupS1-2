@@ -6,12 +6,17 @@ namespace kitchenOS_Scada.Api.Infrastructure.Messaging;
 
 public class RedisMessageBus : IMessageBus
 {
-    public Task PublishAsync<T>(T message, CancellationToken cancellationToken = default) where T : class
+    private readonly IConnectionMultiplexer _connectionMultiplexer;
+    public RedisMessageBus(IConnectionMultiplexer connectionMultiplexer)
     {
-        
+        _connectionMultiplexer = connectionMultiplexer;
+    }
+    public Task PublishAsync<T>(string channel, T message, CancellationToken cancellationToken = default) where T : class
+    {
+        throw new NotImplementedException();
     }
 
-    public void Subscribe<T>(Func<T, CancellationToken, Task> handler) where T : class
+    public void Subscribe<T>(string channel, Func< T, CancellationToken, Task> handler) where T : class
     {
         throw new NotImplementedException();
     }
