@@ -12,7 +12,7 @@ This slice includes:
 
 - Eight equipment profiles: walk-in freezer, stove, oven, mixer, exhaust fan, blender, dishwasher, and sink.
 - Live point values, including power and cumulative energy on every profile except the sink.
-- Commands `setValue`, `start`, `stop`, and `setMode`, with acknowledgement or timeout.
+- Commands `setValue`, `start`, `stop`, `setMode`, and `isOnline`. `isOnline` asks the device to publish telemetry. The others are acknowledged or time out.
 - An alarms table for the current alarm, and a Logger row for each alarm event.
 - A short, queryable history of telemetry, commands, command results, and alarms.
 
@@ -20,34 +20,49 @@ Later work includes users and authentication, a graphical HMI, field protocols, 
 
 ## Architecture
 
-Devices and simulators publish and subscribe through Pub/Sub. The SCADA API is the only component that writes the Logger. Operators talk to the API through the operator interface.
+Devices and simulators publish and subscribe through Pub/Sub. The SCADA API subscribes to device events. The subscription callback reads `eventName` and builds the matching event. It then passes that event to the event service. The event service writes the Logger and notifies clients. Operators talk to the API through the operator interface.
 
 ```mermaid
 flowchart LR
   device[DeviceOrSimulator] -->|eventsAndAcks| pubsub["Pub/Sub"]
-  pubsub -->|eventsAndAcks| api[ScadaApi]
-  operator[OperatorClient] -->|requests| api
+  pubsub -->|events| callback[SubscriptionCallback]
+  callback -->|event| eventService[EventService]
+  eventService -->|append| logger[Logger]
+  eventService -->|notify| clients[Clients]
+  operator[OperatorClient] -->|requests| api[ScadaApi]
   api -->|commands| pubsub
   pubsub -->|commands| device
-  api -->|append| logger[Logger]
   api -->|raiseClearAck| alarms[Alarms]
   api --> cache[CurrentState]
 ```
 
-
-
-
-| Actor               | Role                                                                                            |
-| ------------------- | ----------------------------------------------------------------------------------------------- |
-| Device or simulator | Publishes telemetry, command results, and alarm events. Subscribes for commands.                |
-| SCADA API           | Subscribes to events, publishes commands, writes the Logger, and serves the operator interface. |
-| Operator client     | Reads state, history, and alarms. Sends commands and acknowledgements.                          |
-| Pub/Sub             | Live transport only. It does not keep history.                                                  |
-| Logger              | Append-only record of telemetry, commands, command results, and alarms.                         |
-| Alarms              | One row per alarm occurrence.                                                                   |
-
+| Actor | Role |
+| --- | --- |
+| Device or simulator | Publishes telemetry, command results, and alarm events. Subscribes for commands. |
+| Subscription callback | Receives each message on `kitchenos:events`, reads `eventName`, builds the matching event, and calls the event service. |
+| Event service | Brokers one event: writes the Logger and notifies clients. |
+| SCADA API | Publishes commands, updates current state and alarms, and serves the operator interface. |
+| Operator client | Reads state, history, and alarms. Sends commands and acknowledgements. |
+| Pub/Sub | Live transport only. It does not keep history. |
+| Logger | Append-only record of telemetry, commands, command results, and alarms. |
+| Alarms | One row per alarm occurrence. |
 
 Pub/Sub topics are `kitchenos:events` and `kitchenos:commands`.
+
+### Receiving an event
+
+A message on `kitchenos:events` is an envelope: `eventName`, `deviceId`, `deviceType`, `timestamp`, and `message`. The subscription callback does the conversion in place. There is no separate incoming-event type and no separate converter.
+
+1. Read `eventName`.
+2. Build the event for that name. `telemetry` uses the telemetry message. `command_result` uses the command-result message. `alarm_raised` and `alarm_cleared` use the alarm messages.
+3. Pass the event to the event service.
+
+The event service then:
+
+1. Appends a Logger row for the event.
+2. Notifies connected clients of the event.
+
+`deviceType` is copied from the envelope onto the event. It is not part of `eventName`.
 
 ## Domain
 
@@ -206,7 +221,7 @@ Every message on `kitchenos:events` uses one envelope. `message.timestamp` is th
 
 `kitchenos:events` carries `telemetry`, `command_result`, `alarm_raised`, and `alarm_cleared`.
 
-`kitchenos:commands` carries commands. A command is not an event. The API creates `commandId` before publishing.
+`kitchenos:commands` carries commands. A command is not an event. The API creates `commandId` before publishing. `isOnline` is one of those commands. The client sends it to ask the device for telemetry.
 
 The Logger stores `device_id`, `message_type`, and `message`. It does not store the envelope a second time. Alarm events update the alarms table and are also appended to the Logger. `message_type` is `alarm_raised` or `alarm_cleared`, and `message` is the alarm message body.
 
@@ -383,6 +398,10 @@ classDiagram
         +SetModeArguments Arguments
     }
 
+    class IsOnlineCommand {
+        +string CommandName
+    }
+
     class ValueType {
         <<enumeration>>
         number
@@ -394,6 +413,7 @@ classDiagram
     Command <|-- StartCommand
     Command <|-- StopCommand
     Command <|-- SetModeCommand
+    Command <|-- IsOnlineCommand
     SetValueCommand --> SetValueArguments : Arguments
     SetValueArguments --> ValueType
     StartCommand --> ComponentArguments : Arguments
@@ -403,7 +423,7 @@ classDiagram
 
 
 
-`SetValueCommand.CommandName` is `setValue`. `StartCommand.CommandName` is `start`. `StopCommand.CommandName` is `stop`. `SetModeCommand.CommandName` is `setMode`. The API assigns `CommandId` before the command is published.
+`SetValueCommand.CommandName` is `setValue`. `StartCommand.CommandName` is `start`. `StopCommand.CommandName` is `stop`. `SetModeCommand.CommandName` is `setMode`. `IsOnlineCommand.CommandName` is `isOnline`. The API assigns `CommandId` before the command is published.
 
 ### `telemetry`
 
@@ -425,7 +445,7 @@ Logged. The latest value for each `deviceId` + `component` + `name` replaces the
 
 Logged with `message_type` `command`, and published on `kitchenos:commands`. The stored `message` is the object below, except `deviceId`, which is the `device_id` column.
 
-`commandName` is only `setValue`, `start`, `stop`, or `setMode`.
+`commandName` is only `setValue`, `start`, `stop`, `setMode`, or `isOnline`.
 
 ```json
 {
@@ -444,6 +464,7 @@ Logged with `message_type` `command`, and published on `kitchenos:commands`. The
 | `start`    | optional `component`                                   |
 | `stop`     | optional `component`                                   |
 | `setMode`  | `mode`, optional `component`                           |
+| `isOnline` | none                                                   |
 
 
 ### `command_result`
@@ -488,6 +509,20 @@ Logged with `message_type` `alarm_cleared`. Sets `cleared_at` on the active row 
 ```
 
 Operator acknowledgement is `POST /alarms/{id}/acknowledge`. It is not a device event and it does not append a Logger row.
+
+### `isOnline`
+
+`isOnline` is a command, not an event. The client sends it. The API publishes it on `kitchenos:commands`. The device answers by publishing `telemetry` with its current points. That telemetry event is what the subscription callback builds, and what the event service logs and notifies. `isOnline` does not use `command_result`, and it does not change the device online flag.
+
+```json
+{
+  "commandId": "c0ffee00-0009-4000-8000-000000000001",
+  "commandName": "isOnline",
+  "deviceId": "STOVE",
+  "timestamp": "2026-09-26T13:00:00Z",
+  "arguments": {}
+}
+```
 
 ### Duplicate delivery
 
@@ -1318,13 +1353,13 @@ Alarm:
 
 ## Flows
 
-**Telemetry.** The device publishes `telemetry` on `kitchenos:events`. The API updates the point projection, marks the device online, and appends one Logger row.
+**Telemetry.** The device publishes `telemetry` on `kitchenos:events`. The subscription callback builds a telemetry event and the event service logs it and notifies clients. The API updates the current points and marks the device online.
 
-**Command.** The operator calls `POST /devices/{id}/commands`. The API stores the command as `accepted`, appends a `command` row to the Logger, and publishes on `kitchenos:commands`. The device publishes `command_result` with the same `commandId`. The API moves the command to `acknowledged` or `rejected` and appends a `command_result` row to the Logger. If no result arrives within the configured timeout, the command becomes `timedOut`.
+**Command.** The operator calls `POST /devices/{id}/commands`. The API stores the command as `accepted`, appends a `command` row to the Logger, and publishes on `kitchenos:commands`. The device publishes `command_result` with the same `commandId`. The subscription callback builds that event. The event service logs it and notifies clients. The API moves the command to `acknowledged` or `rejected`. If no result arrives within the configured timeout, the command becomes `timedOut`.
 
-**Alarm.** The device publishes `alarm_raised`. The API inserts an alarms row and appends that message to the Logger. `alarm_cleared` sets `cleared_at` and appends that message to the Logger. An operator acknowledgement sets `acknowledged_at` and leaves the alarm active until a clear arrives.
+**Alarm.** The device publishes `alarm_raised` or `alarm_cleared`. The subscription callback builds that event. The event service logs it and notifies clients. `alarm_raised` inserts an alarms row. `alarm_cleared` sets `cleared_at`. An operator acknowledgement sets `acknowledged_at` and leaves the alarm active until a clear arrives. Acknowledgement is not a device event, so the event service does not log or notify it.
 
-**Offline.** A device that publishes nothing for a configured silence window is marked offline. Its last point values remain.
+**Online.** The client sends `isOnline` on `kitchenos:commands`. The device publishes `telemetry` in response. That telemetry follows the telemetry flow. A device that publishes nothing for a configured silence window is marked offline. Its last point values remain.
 
 ## Persistence
 
@@ -1411,7 +1446,7 @@ Body:
 }
 ```
 
-Accepts the command and returns the command id with state `accepted`. An unknown device is not found. The request fails when Pub/Sub is down. The request is rejected when `commandName` is outside `setValue`, `start`, `stop`, and `setMode`, or when required arguments are missing.
+Accepts the command and returns the command id with state `accepted`. An unknown device is not found. The request fails when Pub/Sub is down. The request is rejected when `commandName` is outside `setValue`, `start`, `stop`, `setMode`, and `isOnline`, or when required arguments are missing.
 
 ### `GET /commands/{commandId}`
 
