@@ -1,6 +1,6 @@
 @kitchenOS_Scada.Api_HostAddress = http://localhost:5253
 
-GET {{kitchenOS_Scada.Api_HostAddress}}/weatherforecast/
+GET {{kitchenOS_Scada.Api_HostAddress}}/health/
 Accept: application/json
 
 ###
