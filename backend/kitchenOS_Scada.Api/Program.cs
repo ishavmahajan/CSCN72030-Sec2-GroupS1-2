@@ -1,4 +1,5 @@
 using kitchenOS_Scada.Api.Infrastructure.Bus;
+using kitchenOS_Scada.Api.Simulator;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,7 +16,7 @@ builder.Services.AddSingleton<IMessageBus>(sp => sp.GetRequiredService<RedisMess
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment()) 
 {
     app.MapOpenApi();
 }
@@ -32,6 +33,7 @@ app.MapGet("/health", () =>
     return Results.Ok(new { status = "Healthy" });
 })
 .WithName("GetHealth");
+
 
 app.Run();
 

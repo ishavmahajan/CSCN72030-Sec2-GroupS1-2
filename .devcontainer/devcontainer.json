@@ -1,0 +1,19 @@
+
+{
+  "name": "KitchenOS .NET Development",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "backend",
+  "workspaceFolder": "/app",
+  "shutdownAction": "none",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "kitchenOS_Scada.Api.csproj"
+      }
+    }
+  }
+}
