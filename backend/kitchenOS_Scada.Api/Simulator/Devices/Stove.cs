@@ -27,6 +27,7 @@ public class Stove : SimulatedDevice
     {
         var stove = new Stove();
         return stove;
+
         if (!json.TryGetProperty("burners", out var burners))
         {
             return stove;

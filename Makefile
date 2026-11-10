@@ -43,7 +43,7 @@ restore:
 	docker compose exec backend dotnet restore
 
 test:
-	docker compose exec backend dotnet test
+	docker compose exec -w /app backend dotnet test kitchenOS_Scada.slnx --logger "console;verbosity=detailed"
 
 clean:
 	docker compose down --volumes --remove-orphans
