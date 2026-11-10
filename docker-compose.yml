@@ -1,13 +1,9 @@
 services:
-
   redis:
     image: redis:7-alpine
-
     container_name: kitchen-os-redis
-
     ports:
       - "6379:6379"
-
     restart: unless-stopped
 
   backend:
@@ -17,7 +13,6 @@ services:
       target: development
 
     container_name: kitchen-os-scada-api
-
     working_dir: /app
 
     volumes:
@@ -36,4 +31,34 @@ services:
       DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
       ConnectionStrings__Redis: redis:6379
 
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+
+    container_name: kitchen-os-frontend
+    working_dir: /app
+
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+    ports:
+      - "3020:3000"
+
+    depends_on:
+      - backend
+
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      WATCHPACK_POLLING: "true"
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      INTERNAL_API_URL: http://backend:8080
+
+    command: sh -c "npm install && npm run dev -- --hostname 0.0.0.0"
     restart: unless-stopped
