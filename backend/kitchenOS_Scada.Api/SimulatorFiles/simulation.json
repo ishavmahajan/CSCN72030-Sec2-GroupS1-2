@@ -1,0 +1,89 @@
+
+{
+  "WALK_IN_FREEZER": {
+    "temperature": [-25, -22, -20, -18, -15],
+    "setpoint": [-25, -22, -20, -18, -15],
+    "compressor": ["on", "off"],
+    "door": ["closed", "open"],
+    "power": [0, 500, 700, 860, 1000],
+    "energy": [100, 200, 300, 400, 500]
+  },
+  "STOVE": {
+    "burners": {
+      "burner1": {
+        "temperature": [0, 100, 150, 190, 250],
+        "setpoint": [0, 100, 150, 190, 250],
+        "heating": ["on", "off"],
+        "power": [0, 1000, 1800, 2400, 3000],
+        "energy": [0, 5, 10, 15, 20]
+      },
+      "burner2": {
+        "temperature": [0, 100, 150, 190, 250],
+        "setpoint": [0, 100, 150, 190, 250],
+        "heating": ["on", "off"],
+        "power": [0, 1000, 1800, 2400, 3000],
+        "energy": [0, 5, 10, 15, 20]
+      },
+      "burner3": {
+        "temperature": [0, 100, 150, 190, 250],
+        "setpoint": [0, 100, 150, 190, 250],
+        "heating": ["on", "off"],
+        "power": [0, 1000, 1800, 2400, 3000],
+        "energy": [0, 5, 10, 15, 20]
+      },
+      "burner4": {
+        "temperature": [0, 100, 150, 190, 250],
+        "setpoint": [0, 100, 150, 190, 250],
+        "heating": ["on", "off"],
+        "power": [0, 1000, 1800, 2400, 3000],
+        "energy": [0, 5, 10, 15, 20]
+      }
+    }
+  },
+  "OVEN": {
+    "temperature": [50, 100, 150, 180, 220],
+    "setpoint": [50, 100, 150, 180, 220],
+    "timer": [0, 300, 600, 1200, 1800],
+    "door": ["closed", "open"],
+    "mode": ["bake", "broil", "roast", "convection", "off"],
+    "power": [0, 1000, 2000, 3200, 4000],
+    "energy": [0, 20, 40, 60, 100]
+  },
+  "MIXER": {
+    "motor": ["on", "off"],
+    "speed": [0, 60, 120, 180, 240],
+    "power": [0, 250, 500, 750, 1000],
+    "energy": [0, 5, 10, 15, 20],
+    "mode": ["idle", "mixing", "kneading", "whipping", "stopped"]
+  },
+  "EXHAUST_FAN": {
+    "fanSpeed": [0, 20, 40, 60, 100],
+    "airflow": [0, 400, 800, 1200, 1600],
+    "filter": ["ok", "dirty", "blocked", "missing", "replace"],
+    "powerState": ["on", "off"],
+    "power": [0, 100, 200, 410, 500],
+    "energy": [0, 20, 40, 60, 100]
+  },
+  "BLENDER": {
+    "motor": ["on", "off"],
+    "speed": [0, 4000, 8000, 12000, 16000],
+    "power": [0, 300, 600, 900, 1200],
+    "energy": [0, 2, 4, 6, 10],
+    "mode": ["idle", "blend", "pulse", "crush", "stopped"]
+  },
+  "DISHWASHER": {
+    "temperature": [20, 40, 60, 70, 80],
+    "cycle": ["idle", "washing", "rinsing", "drying", "completed"],
+    "waterLevel": [0, 20, 40, 60, 80],
+    "detergent": [0, 20, 40, 60, 100],
+    "power": [0, 500, 1000, 1500, 2100],
+    "energy": [0, 10, 20, 30, 40]
+  },
+  "SINK": {
+    "temperature": [10, 20, 30, 40, 50],
+    "flow": [0, 2, 4, 6, 8],
+    "consumption": [0, 250, 500, 1000, 1500],
+    "leak": [true, false],
+    "valve": ["open", "closed"]
+  }
+}

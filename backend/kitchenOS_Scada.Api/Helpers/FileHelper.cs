@@ -6,10 +6,12 @@ class FileHelper
     {
         var currentDirectory = Directory.GetCurrentDirectory();
         var filePath = Path.Combine(currentDirectory, "SimulatorFiles", fileName);
+        Console.WriteLine($"Looking for file '{fileName}' at path: {filePath}");
+        
         return filePath;
     }
 
-    public static string GetDeviceFromJsonFile(string fileName)
+    public static string GetSimulationData(string fileName)
     {
         var filePath = GetFilePath(fileName);
         if (!File.Exists(filePath))

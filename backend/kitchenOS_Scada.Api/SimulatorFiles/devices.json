@@ -1,0 +1,67 @@
+
+[
+  {
+    "deviceName": "Walk-In-Freezer-1",
+    "deviceType": "WALK_IN_FREEZER"
+  },
+  {
+    "deviceName": "Walk-In-Freezer-2",
+    "deviceType": "WALK_IN_FREEZER"
+  },
+  {
+    "deviceName": "Stove-1",
+    "deviceType": "STOVE"
+  },
+  {
+    "deviceName": "Stove-2",
+    "deviceType": "STOVE"
+  },
+  {
+    "deviceName": "Oven-1",
+    "deviceType": "OVEN"
+  },
+  {
+    "deviceName": "Oven-2",
+    "deviceType": "OVEN"
+  },
+  {
+    "deviceName": "Mixer-1",
+    "deviceType": "MIXER"
+  },
+  {
+    "deviceName": "Mixer-2",
+    "deviceType": "MIXER"
+  },
+  {
+    "deviceName": "Exhaust-Fan-1",
+    "deviceType": "EXHAUST_FAN"
+  },
+  {
+    "deviceName": "Exhaust-Fan-2",
+    "deviceType": "EXHAUST_FAN"
+  },
+  {
+    "deviceName": "Blender-1",
+    "deviceType": "BLENDER"
+  },
+  {
+    "deviceName": "Blender-2",
+    "deviceType": "BLENDER"
+  },
+  {
+    "deviceName": "Dishwasher-1",
+    "deviceType": "DISHWASHER"
+  },
+  {
+    "deviceName": "Dishwasher-2",
+    "deviceType": "DISHWASHER"
+  },
+  {
+    "deviceName": "Sink-1",
+    "deviceType": "SINK"
+  },
+  {
+    "deviceName": "Sink-2",
+    "deviceType": "SINK"
+  }
+]

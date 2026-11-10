@@ -20,14 +20,29 @@ public class Oven : SimulatedDevice
     public static Oven FromJson(JsonElement json)
     {
         var oven = new Oven();
-        oven.Temperature = DeviceJson.ReadNumber(json, "temperature");
-        oven.Setpoint = DeviceJson.ReadNumber(json, "setpoint");
-        oven.Timer = DeviceJson.ReadNumber(json, "timer");
-        oven.Door = DeviceJson.ReadText(json, "door");
-        oven.Mode = DeviceJson.ReadText(json, "mode");
-        oven.Power = DeviceJson.ReadNumber(json, "power");
-        oven.Energy = DeviceJson.ReadNumber(json, "energy");
+        Random random = new Random();
+        oven.Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), oven.Temperature, false);
+        oven.Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), oven.Setpoint, false);
+        oven.Timer = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "timer"), oven.Timer, false);
+        oven.Door = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "door"));
+        oven.Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
+        oven.Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), oven.Power, false);
+        oven.Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), oven.Energy, false);
+        oven.setJson(json);
         return oven;
+    }
+
+    public override void refreshFromJson()
+    {
+        Random random = new Random();
+        JsonElement json = _json;
+        Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), Temperature, false);
+        Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
+        Timer = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "timer"), Timer, false);
+        Door = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "door"));
+        Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
+        Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
+        Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), Energy, false);
     }
 
     public override List<PointReading> ReadPoints()
@@ -44,13 +59,45 @@ public class Oven : SimulatedDevice
         };
     }
 
-    public override bool TrySetValue(string name, JsonElement value, string? component, out string? reason)
+    public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
-        if (name == "setpoint" && DeviceJson.TryUseNumber(value, new List<double>(), out var setpoint, out reason))
+
+        if (name == "temperature" && value is double temperature)
         {
-            Setpoint = setpoint;
+            Temperature = temperature;
+            reason = null;
             return true;
         }
+
+        if (name == "setpoint" && value is double setpoint)
+        {
+            Setpoint = setpoint;
+            reason = null;
+            return true;
+        }
+
+        if (name == "timer" && value is double timer)
+        {
+            Timer = timer;
+            reason = null;
+            return true;
+        }
+
+        if (name == "door" && value is string door)
+        {
+            Door = door;
+            reason = null;
+            return true;
+        }
+        if (name == "mode" && value is string mode)
+        {
+            Mode = mode;
+            reason = null;
+            return true;
+        }
+
+        
+        
 
         reason = "unknown property";
         return false;

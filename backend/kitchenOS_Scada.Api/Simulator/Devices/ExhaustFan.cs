@@ -19,13 +19,26 @@ public class ExhaustFan : SimulatedDevice
     public static ExhaustFan FromJson(JsonElement json)
     {
         var fan = new ExhaustFan();
-        fan.FanSpeed = DeviceJson.ReadNumber(json, "fanSpeed");
-        fan.Airflow = DeviceJson.ReadNumber(json, "airflow");
-        fan.Filter = DeviceJson.ReadText(json, "filter");
-        fan.PowerState = DeviceJson.ReadText(json, "powerState");
-        fan.Power = DeviceJson.ReadNumber(json, "power");
-        fan.Energy = DeviceJson.ReadNumber(json, "energy");
+        Random random = new Random();
+        fan.FanSpeed = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "fanSpeed"), fan.FanSpeed, false);
+        fan.Airflow = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "airflow"), fan.Airflow, false);
+        fan.Filter = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "filter"), fan.Filter, false);
+        fan.PowerState = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "powerState"), fan.PowerState, false);
+        fan.Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), fan.Power, false);
+        fan.Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), fan.Energy, false);
         return fan;
+    }
+
+    public override void refreshFromJson()
+    {
+        Random random = new Random();
+        JsonElement json = _json;
+        FanSpeed = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "fanSpeed"), FanSpeed, false);
+        Airflow = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "airflow"), Airflow, false);
+        Filter = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "filter"), Filter, false);
+        PowerState = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "powerState"), PowerState, false);
+        Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
+        Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), Energy, false);
     }
 
     public override List<PointReading> ReadPoints()
@@ -41,11 +54,19 @@ public class ExhaustFan : SimulatedDevice
         };
     }
 
-    public override bool TrySetValue(string name, JsonElement value, string? component, out string? reason)
+    public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
-        if (name == "fanSpeed" && DeviceJson.TryUseNumber(value, new List<double>(), out var fanSpeed, out reason))
+        if (name == "fanSpeed" && value is double fanSpeed)
         {
             FanSpeed = fanSpeed;
+            reason = null;
+            return true;
+        }
+
+        if (name == "powerState" && value is string powerState)
+        {
+            PowerState = powerState;
+            reason = null;
             return true;
         }
 

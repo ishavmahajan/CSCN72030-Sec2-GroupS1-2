@@ -15,19 +15,24 @@ public class DeviceSimulator : IDeviceSimulator
     private IMessageBus? _messageBus;
     private bool _running;
 
-    public void Load(string simulationFilePath, IMessageBus messageBus)
+    public void Load(string devicesString, string simulationString, IMessageBus messageBus)
     {
         _messageBus = messageBus;
         _devices.Clear();
 
-        using var document = JsonDocument.Parse(File.ReadAllText(simulationFilePath));
-        Console.WriteLine($"Loaded {document.RootElement.GetProperty("devices").GetArrayLength()} devices from {simulationFilePath}.");
-        return;
-        foreach (var item in document.RootElement.GetProperty("devices").EnumerateArray())
+        using var parsedDevices = JsonDocument.Parse(devicesString);
+        JsonElement parsedDevicesRoot = parsedDevices.RootElement;
+
+        var parsedSimulation = JsonDocument.Parse(simulationString);
+        JsonElement parsedSimulationRoot = parsedSimulation.RootElement;
+
+        foreach (JsonElement item in parsedDevicesRoot.EnumerateArray())
         {
-            var deviceType = item.GetProperty("deviceType").GetString()
-                ?? throw new InvalidOperationException("deviceType is missing.");
-            _devices.Add(SimulatedDevice.Create(deviceType, item));
+            string deviceType = item.GetProperty("deviceType").GetString() ?? "";
+            JsonElement dummyData = parsedSimulationRoot.GetProperty(deviceType);
+            SimulatedDevice device = SimulatedDevice.Create(deviceType, dummyData);
+            device.setDeviceName(item.GetProperty("deviceName").GetString() ?? "").setJson(dummyData.Clone());
+            _devices.Add(device);
         }
     }
 
@@ -35,7 +40,7 @@ public class DeviceSimulator : IDeviceSimulator
     {
         foreach (var device in _devices)
         {
-            device.UpdateProperties(_random);
+            device.refreshFromJson();
         }
     }
 
@@ -47,7 +52,7 @@ public class DeviceSimulator : IDeviceSimulator
         }
     }
 
-    public async Task Start(CancellationToken cancellationToken = default)
+  public Task Start(CancellationToken cancellationToken = default)
     {
         if (_messageBus is null)
         {
@@ -55,11 +60,35 @@ public class DeviceSimulator : IDeviceSimulator
         }
 
         _running = true;
-        UpdateProperties();
-        await PublishEvents(cancellationToken);
-        _messageBus.Subscribe<DeviceCommand>(CommandsChannel, OnCommand);
-    }
 
+        Console.WriteLine("Starting device simulation...");
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (_running && !cancellationToken.IsCancellationRequested)
+                {
+                    Console.WriteLine("Updating device properties and publishing telemetry...");
+
+                    UpdateProperties();
+                    // await PublishEvents(cancellationToken);
+
+                    await Task.Delay(10000, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                Console.WriteLine("Simulation cancelled.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Simulation error: {ex}");
+            }
+        }, cancellationToken);
+
+        return Task.CompletedTask;
+    }
     public void Stop()
     {
         _running = false;
@@ -73,7 +102,8 @@ public class DeviceSimulator : IDeviceSimulator
         }
 
         var device = _devices.FirstOrDefault(item => item.DeviceId == command.DeviceId);
-        if (device is null)
+        // If the device is not found and the command has no arguments, we ignore it
+        if (device is null && command.Arguments?.Value is null)
         {
             return;
         }
@@ -165,6 +195,7 @@ public class DeviceSimulator : IDeviceSimulator
         return Bus.PublishAsync(EventsChannel, envelope, cancellationToken);
     }
 
+
     private Task PublishResult(
         SimulatedDevice device,
         string commandId,
@@ -194,6 +225,11 @@ public class DeviceSimulator : IDeviceSimulator
     private IMessageBus Bus => _messageBus ?? throw new InvalidOperationException("Call Load before publishing.");
 
     private static string UtcNow() => DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+    public List<SimulatedDevice> GetDevices()
+    {
+        return _devices;
+    }
 }
 
 public class DeviceCommand

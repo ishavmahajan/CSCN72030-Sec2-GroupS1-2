@@ -29,6 +29,17 @@ public class Blender : SimulatedDevice
         return blender;
     }
 
+    public override void refreshFromJson()
+    {
+        Random random = new Random();
+        JsonElement json = _json;
+        Motor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "motor"));
+        Speed = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "speed"), Speed, false);
+        Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
+        Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), Energy, false);
+    }
+
+
     public override void UpdateProperties(Random random)
     {
         Speed = DeviceJson.Pick(random, speedChoices, Speed, speedSetByCommand);
@@ -45,15 +56,22 @@ public class Blender : SimulatedDevice
         };
     }
 
-    public override bool TrySetValue(string name, JsonElement value, string? component, out string? reason)
+    public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
-        if (name == "speed" && DeviceJson.TryUseNumber(value, speedChoices, out var speed, out reason))
+        if (name == "speed" && value is double speed)
         {
             Speed = speed;
-            speedSetByCommand = true;
+            reason = null;
             return true;
         }
 
+        if (name == "motor" && value is string motor)
+        {
+            Motor = motor;
+            reason = null;
+            return true;
+        }
+        
         reason = "unknown property";
         return false;
     }

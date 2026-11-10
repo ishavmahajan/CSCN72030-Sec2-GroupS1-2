@@ -23,14 +23,27 @@ public class WalkInFreezer : SimulatedDevice
     public static WalkInFreezer FromJson(JsonElement json)
     {
         var device = new WalkInFreezer();
-        device.Temperature = DeviceJson.ReadNumber(json, "temperature");
-        device.Setpoint = DeviceJson.ReadNumber(json, "setpoint");
-        device.Compressor = DeviceJson.ReadText(json, "compressor");
-        device.Door = DeviceJson.ReadText(json, "door");
-        device.doorChoices.AddRange(DeviceJson.ReadTextList(json, "door"));
-        device.Power = DeviceJson.ReadNumber(json, "power");
-        device.Energy = DeviceJson.ReadNumber(json, "energy");
+        Random random = new Random();
+        device.Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), device.Temperature, false);
+        device.Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), device.Setpoint, false);
+        device.Compressor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "compressor"));
+        device.Door = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "door"));
+        // device.doorChoices.AddRange(DeviceJson.ReadTextList(json, "door"));
+        device.Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), device.Power, false);
+        device.Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), device.Energy, false);
         return device;
+    }
+
+    public override void refreshFromJson()
+    {
+        Random random = new Random();
+        JsonElement json = _json;
+        Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), Temperature, false);
+        Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
+        Compressor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "compressor"));
+        Door = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "door"));
+        Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
+        Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), Energy, false);
     }
 
     public override void UpdateProperties(Random random)
@@ -51,18 +64,19 @@ public class WalkInFreezer : SimulatedDevice
         };
     }
 
-    public override bool TrySetValue(string name, JsonElement value, string? component, out string? reason)
+    public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
-        if (name == "setpoint" && DeviceJson.TryUseNumber(value, new List<double>(), out var setpoint, out reason))
+        if (name == "setpoint" && value is double setpoint)
         {
             Setpoint = setpoint;
+            reason = null;
             return true;
         }
 
-        if (name == "door" && DeviceJson.TryUseText(value, doorChoices, out var door, out reason))
+        if (name == "mode" && value is string mode)
         {
-            Door = door;
-            doorSetByCommand = true;
+            Mode = mode;
+            reason = null;
             return true;
         }
 

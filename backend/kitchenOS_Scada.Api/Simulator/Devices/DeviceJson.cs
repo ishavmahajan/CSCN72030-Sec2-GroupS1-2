@@ -4,6 +4,7 @@ namespace kitchenOS_Scada.Api.Simulator.Devices;
 
 public static class DeviceJson
 {
+
     public static double ReadNumber(JsonElement json, string name)
     {
         if (!json.TryGetProperty(name, out var value))
@@ -97,6 +98,24 @@ public static class DeviceJson
         return false;
     }
 
+    public static List<bool> ReadBoolList(JsonElement json, string name)
+    {
+        var choices = new List<bool>();
+        if (!json.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return choices;
+        }
+
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind is JsonValueKind.True or JsonValueKind.False)
+            {
+                choices.Add(item.GetBoolean());
+            }
+        }
+
+        return choices;
+    }
     public static double Pick(Random random, List<double> choices, double current, bool lockedByCommand)
     {
         if (lockedByCommand || choices.Count == 0)
@@ -107,7 +126,14 @@ public static class DeviceJson
         return choices[random.Next(choices.Count)];
     }
 
-    public static string Pick(Random random, List<string> choices, string current, bool lockedByCommand)
+  public static T Pick<T>(Random random, List<T> choices)
+    {
+       
+
+        return choices[random.Next(choices.Count)];
+    }
+
+    public static T Pick<T>(Random random, List<T> choices, T current, bool lockedByCommand)
     {
         if (lockedByCommand || choices.Count == 0)
         {

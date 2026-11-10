@@ -3,14 +3,36 @@ using kitchenOS_Scada.Api.Enums;
 
 namespace kitchenOS_Scada.Api.Simulator.Devices;
 
-public class SimulatedDevice
+public interface ISimulatedDevice
 {
+    Guid DeviceId { get; }
+    DeviceTypes DeviceType { get; }
+
+
+    void UpdateProperties(Random random);
+    ISimulatedDevice setJson(JsonElement json);
+    List<PointReading> ReadPoints();
+    bool TrySetValue<T>(string name, T value, string? component, out string? reason);
+    bool StartComponent(string? component);
+    bool StopComponent(string? component);
+    bool TrySetMode(string mode, string? component, out string? reason);
+    abstract public void refreshFromJson();
+}
+public abstract class SimulatedDevice : ISimulatedDevice
+{
+    protected JsonElement _json;
+
+    public string DeviceName { get; set; }
+
+
     public SimulatedDevice(DeviceTypes deviceType)
     {
         DeviceId = Guid.NewGuid();
         DeviceType = deviceType;
+        DeviceName = "N/A";
     }
 
+    abstract public void refreshFromJson();
     public Guid DeviceId { get; }
     public DeviceTypes DeviceType { get; }
 
@@ -18,12 +40,18 @@ public class SimulatedDevice
     {
     }
 
+    public virtual ISimulatedDevice setJson(JsonElement json)
+    {
+        _json = json;
+        return this;
+    }
+
     public virtual List<PointReading> ReadPoints()
     {
         return new List<PointReading>();
     }
 
-    public virtual bool TrySetValue(string name, JsonElement value, string? component, out string? reason)
+    public virtual bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
         reason = "unknown property";
         return false;
@@ -58,6 +86,14 @@ public class SimulatedDevice
 
         throw new ArgumentException($"Unknown device type: {deviceType}");
     }
+
+    public SimulatedDevice setDeviceName(string deviceName)
+    {
+        DeviceName = deviceName;
+        return this;
+    }
+    
+
 }
 
 public class PointReading

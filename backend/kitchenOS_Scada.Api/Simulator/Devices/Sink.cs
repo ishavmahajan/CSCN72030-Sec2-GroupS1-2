@@ -26,8 +26,19 @@ public class Sink : SimulatedDevice
         sink.Consumption = DeviceJson.ReadNumber(json, "consumption");
         sink.Leak = DeviceJson.ReadBool(json, "leak");
         sink.Valve = DeviceJson.ReadText(json, "valve");
-        sink.valveChoices.AddRange(DeviceJson.ReadTextList(json, "valve"));
+        // sink.valveChoices.AddRange(DeviceJson.ReadTextList(json, "valve"));
         return sink;
+    }
+
+    public override void refreshFromJson()
+    {
+        Random random = new Random();
+        JsonElement json = _json;
+        Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), Temperature, false);
+        Flow = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "flow"), Flow, false);
+        Consumption = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "consumption"), Consumption, false);
+        Leak = DeviceJson.Pick(random, DeviceJson.ReadBoolList(json, "leak"), Leak, false);
+        Valve = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "valve"));
     }
 
     public override void UpdateProperties(Random random)
@@ -46,38 +57,13 @@ public class Sink : SimulatedDevice
             new PointReading("valve", Valve, null, null)
         };
     }
-
-    public override bool TrySetValue(string name, JsonElement value, string? component, out string? reason)
+    
+    public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
-        if (name == "temperature" && DeviceJson.TryUseNumber(value, new List<double>(), out var temperature, out reason))
+        if (name == "temperature" && value is double temperature)
         {
             Temperature = temperature;
-            return true;
-        }
-
-        if (name == "flow" && DeviceJson.TryUseNumber(value, new List<double>(), out var flow, out reason))
-        {
-            Flow = flow;
-            return true;
-        }
-
-        if (name == "consumption" && DeviceJson.TryUseNumber(value, new List<double>(), out var consumption, out reason))
-        {
-            Consumption = consumption;
-            return true;
-        }
-
-        if (name == "leak" && value.ValueKind is JsonValueKind.True or JsonValueKind.False)
-        {
-            Leak = value.GetBoolean();
             reason = null;
-            return true;
-        }
-
-        if (name == "valve" && DeviceJson.TryUseText(value, valveChoices, out var valve, out reason))
-        {
-            Valve = valve;
-            valveSetByCommand = true;
             return true;
         }
 

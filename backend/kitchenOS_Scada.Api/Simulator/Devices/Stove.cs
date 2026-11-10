@@ -26,6 +26,7 @@ public class Stove : SimulatedDevice
     public static Stove FromJson(JsonElement json)
     {
         var stove = new Stove();
+        return stove;
         if (!json.TryGetProperty("burners", out var burners))
         {
             return stove;
@@ -46,6 +47,13 @@ public class Stove : SimulatedDevice
 
         return stove;
     }
+
+    public override void refreshFromJson()
+    {
+        
+    }
+
+    
 
     public override void UpdateProperties(Random random)
     {
@@ -70,33 +78,33 @@ public class Stove : SimulatedDevice
         return points;
     }
 
-    public override bool TrySetValue(string name, JsonElement value, string? component, out string? reason)
+    public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
-        var burner = Find(component);
-        if (burner == null)
-        {
-            reason = "component is required";
-            return false;
-        }
+        // var burner = Find(component);
+        // if (burner == null)
+        // {
+        //     reason = "component is required";
+        //     return false;
+        // }
 
-        if (name == "temperature" && DeviceJson.TryUseNumber(value, new List<double>(), out var temperature, out reason))
-        {
-            burner.Temperature = temperature;
-            return true;
-        }
+        // if (name == "temperature" && DeviceJson.TryUseNumber(value, new List<double>(), out var temperature, out reason))
+        // {
+        //     burner.Temperature = temperature;
+        //     return true;
+        // }
 
-        if (name == "setpoint" && DeviceJson.TryUseNumber(value, new List<double>(), out var setpoint, out reason))
-        {
-            burner.Setpoint = setpoint;
-            return true;
-        }
+        // if (name == "setpoint" && DeviceJson.TryUseNumber(value, new List<double>(), out var setpoint, out reason))
+        // {
+        //     burner.Setpoint = setpoint;
+        //     return true;
+        // }
 
-        if (name == "heating" && DeviceJson.TryUseText(value, burner.HeatingChoices, out var heating, out reason))
-        {
-            burner.Heating = heating;
-            burner.HeatingSetByCommand = true;
-            return true;
-        }
+        // if (name == "heating" && DeviceJson.TryUseText(value, burner.HeatingChoices, out var heating, out reason))
+        // {
+        //     burner.Heating = heating;
+        //     burner.HeatingSetByCommand = true;
+        //     return true;
+        // }
 
         reason = "unknown property";
         return false;
