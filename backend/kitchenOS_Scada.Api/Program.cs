@@ -1,31 +1,36 @@
+using System.Net.WebSockets;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
+using kitchenOS_Scada.Api.Notifier;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
-builder.Services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisConnection));
+string redisConnection =
+    builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    ConnectionMultiplexer.Connect(redisConnection));
+
 builder.Services.AddSingleton<RedisMessageBus>();
-builder.Services.AddSingleton<IMessageBus>(sp => sp.GetRequiredService<RedisMessageBus>());
+builder.Services.AddSingleton<IMessageBus>(services =>
+    services.GetRequiredService<RedisMessageBus>());
+
+builder.Services.AddSingleton<WebSocketClientNotifier>();
+builder.Services.AddSingleton<IClientNotifier>(services =>
+    services.GetRequiredService<WebSocketClientNotifier>());
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+app.UseWebSockets();
+app.UseHttpsRedirection();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+
 }
-
-app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    ""
-};
 
 app.MapGet("/health", () =>
 {
@@ -33,6 +38,52 @@ app.MapGet("/health", () =>
 })
 .WithName("GetHealth");
 
+app.Map("/ws", async (HttpContext context, WebSocketClientNotifier notifier) =>
+{
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        return;
+    }
+
+    using WebSocket socket =
+        await context.WebSockets.AcceptWebSocketAsync();
+
+    Guid clientId = notifier.AddClient(socket);
+    byte[] buffer = new byte[4096];
+
+    try
+    {
+        while (socket.State == WebSocketState.Open)
+        {
+            WebSocketReceiveResult result = await socket.ReceiveAsync(
+                new ArraySegment<byte>(buffer),
+                context.RequestAborted);
+
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                await socket.CloseOutputAsync(
+                    WebSocketCloseStatus.NormalClosure,
+                    "Connection closed",
+                    context.RequestAborted);
+
+                break;
+            }
+        }
+    }
+    catch (WebSocketException)
+    {
+        // The client disconnected unexpectedly.
+    }
+    catch (OperationCanceledException)
+        when (context.RequestAborted.IsCancellationRequested)
+    {
+        // The request was cancelled.
+    }
+    finally
+    {
+        notifier.RemoveClient(clientId);
+    }
+});
+
 app.Run();
-
-
