@@ -13,6 +13,9 @@ public class WalkInFreezer : SimulatedDevice
     public double Energy { get; set; }
     public string Mode { get; set; } = "";
 
+    public override int RefreshRate { get; } = 101000;
+
+
     private readonly List<string> doorChoices = new();
     private bool doorSetByCommand;
 

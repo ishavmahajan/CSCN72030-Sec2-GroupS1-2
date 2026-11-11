@@ -10,6 +10,8 @@ public class Dishwasher : SimulatedDevice
     public double WaterLevel { get; set; }
     public double Detergent { get; set; }
     public double Power { get; set; }
+    public override int RefreshRate { get; } = 55000;
+
     public double Energy { get; set; }
 
     public Dishwasher() : base(DeviceTypes.Dishwasher)

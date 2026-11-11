@@ -38,11 +38,13 @@ public class DeviceSimulator : IDeviceSimulator
 
     public void UpdateProperties()
     {
-        foreach (var device in _devices)
-        {
-            device.refreshFromJson();
-        }
+        // foreach (var device in _devices)
+        // {
+        //     device.UpdateProperties(_random);
+        // }
     }
+
+
 
     public async Task PublishEvents(CancellationToken cancellationToken = default)
     {
@@ -52,16 +54,25 @@ public class DeviceSimulator : IDeviceSimulator
         }
     }
 
-  public Task Start(CancellationToken cancellationToken = default)
+    public async Task Start(CancellationToken cancellationToken = default)
     {
-        if (_messageBus is null)
+        foreach  (var device in _devices)
+        {
+            await StartDeviceSimulation(device, cancellationToken);
+        }
+      
+    }
+
+    public Task StartDeviceSimulation(SimulatedDevice device, CancellationToken cancellationToken)
+    {
+          if (_messageBus is null)
         {
             throw new InvalidOperationException("Call Load before Start.");
         }
 
         _running = true;
 
-        Console.WriteLine("Starting device simulation...");
+        Console.WriteLine("Starting device simulation for {device.DeviceName}...");
 
         _ = Task.Run(async () =>
         {
@@ -69,12 +80,12 @@ public class DeviceSimulator : IDeviceSimulator
             {
                 while (_running && !cancellationToken.IsCancellationRequested)
                 {
-                    Console.WriteLine("Updating device properties and publishing telemetry...");
+                    Console.WriteLine($"Updating device properties and publishing telemetry for {device.DeviceName} every {device.RefreshRate} ms...");
 
-                    UpdateProperties();
-                    // await PublishEvents(cancellationToken);
+                    device.refreshFromJson();
+                    //Todo:  await PublishTelemetry(device, cancellationToken);
 
-                    await Task.Delay(10000, cancellationToken);
+                    await Task.Delay(device.RefreshRate, cancellationToken);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -89,6 +100,7 @@ public class DeviceSimulator : IDeviceSimulator
 
         return Task.CompletedTask;
     }
+    
     public void Stop()
     {
         _running = false;

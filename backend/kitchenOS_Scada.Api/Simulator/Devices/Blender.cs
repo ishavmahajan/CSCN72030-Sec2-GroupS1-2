@@ -9,6 +9,8 @@ public class Blender : SimulatedDevice
     public double Speed { get; set; }
     public double Power { get; set; }
     public double Energy { get; set; }
+    public override int RefreshRate { get; } = 140000;
+
 
     private readonly List<double> speedChoices = new();
     private bool speedSetByCommand;

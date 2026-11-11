@@ -1,0 +1,11 @@
+<svg width="460" height="112" viewBox="0 0 460 112" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">KitchenOS</title>
+  <desc id="desc">KitchenOS industrial kitchen monitoring and control</desc>
+  <g stroke="#FF6A00" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 40C13 40 8 34 8 27c0-8 6-14 15-14 3-8 11-13 20-13 10 0 18 5 22 14 9-1 17 5 17 14 0 7-6 12-14 12H22Z" fill="#FF6A00"/>
+    <path d="M31 39v53c0 7 5 12 12 12h9c7 0 12-5 12-12V39" stroke="white"/>
+    <path d="M39 57h17M39 70h17M39 83h17" stroke="white"/>
+  </g>
+  <text x="103" y="78" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="61" font-weight="800" letter-spacing="-3">KITCHEN</text>
+  <text x="374" y="78" fill="#FF6A00" font-family="Arial, Helvetica, sans-serif" font-size="61" font-weight="800" letter-spacing="-3">OS</text>
+</svg>

@@ -12,6 +12,8 @@ public class Burner
     public double Power { get; set; }
     public double Energy { get; set; }
     public bool HeatingSetByCommand { get; set; }
+    public int RefreshRate { get; } = 81000;
+
     public List<string> HeatingChoices { get; set; } = new();
 }
 

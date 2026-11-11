@@ -1,12 +1,15 @@
 using kitchenOS_Scada.Api.Infrastructure.Bus;
+using kitchenOS_Scada.Api.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Simulator;
 
 public interface IDeviceSimulator
 {
     void Load(string devicesString, string simulationString,  IMessageBus messageBus);
-    void UpdateProperties();
-    Task PublishEvents(CancellationToken cancellationToken = default);
-    Task Start(CancellationToken cancellationToken = default);
+    // void UpdateProperties();
+    // Task PublishEvents(CancellationToken cancellationToken = default);
+     Task Start(CancellationToken cancellationToken = default);
+     Task StartDeviceSimulation(SimulatedDevice device, CancellationToken cancellationToken);
+
     void Stop();
 }

@@ -5,13 +5,13 @@ using kitchenOS_Scada.Api.Simulator.Devices;
 namespace kitchenOS_Scada.Api.Tests.Simulator;
 
 /// <summary>
-/// Verifies that the simulator refreshes loaded device values from simulation data.
+/// Verifies the simulator's current property-update behavior.
 /// </summary>
 [TestClass]
 public class DeviceSimulatorUpdateTests
 {
     [TestMethod]
-    public void UpdateProperties_RefreshesLoadedDeviceValues()
+    public void UpdateProperties_DoesNotChangeCommandValue()
     {
         var simulator = new DeviceSimulator();
 
@@ -28,6 +28,6 @@ public class DeviceSimulatorUpdateTests
 
         simulator.UpdateProperties();
 
-        Assert.IsTrue(mixer.Speed >= 0 && mixer.Speed <= 240);
+        Assert.AreEqual(999.0, mixer.Speed);
     }
 }

@@ -1,140 +1,52 @@
 'use client'
 
-import { useState } from 'react'
-import {
-  Activity,
-  AlertTriangle,
-  Bell,
-  ChevronDown,
-  CircleHelp,
-  Fan,
-  Gauge,
-  LayoutDashboard,
-  Menu,
-  MoreHorizontal,
-  Power,
-  Refrigerator,
-  Search,
-  Settings2,
-  ShieldCheck,
-  Snowflake,
-  Thermometer,
-  Utensils,
-  Waves,
-  X,
-  Zap,
-} from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Activity, AlertTriangle, Bell, CalendarDays, ChevronDown, ClipboardList, Clock3, Fan, Gauge, Layers3, LayoutGrid, Menu, Play, Power, Settings, SlidersHorizontal, Snowflake, Square, Thermometer, Utensils, Waves, X, Zap } from 'lucide-react'
 
-const equipment = [
-  { id: 'walk-in-freezer-1', name: 'Walk-in freezer 1', zone: 'Cold storage', value: '-18', unit: '°C', icon: Snowflake, status: 'Normal', accent: 'blue', detail: 'Compressor on · 860 W', controls: ['ON', 'OFF'] },
-  { id: 'walk-in-freezer-2', name: 'Walk-in freezer 2', zone: 'Cold storage', value: '-17', unit: '°C', icon: Snowflake, status: 'Normal', accent: 'blue', detail: 'Compressor on · 820 W', controls: ['ON', 'OFF'] },
-  { id: 'stove-1', name: 'Stove 1', zone: 'Line 01', value: '190', unit: '°C', icon: Utensils, status: 'Running', accent: 'orange', detail: '2 burners heating · 2.4 kW', controls: ['ON', 'OFF'] },
-  { id: 'stove-2', name: 'Stove 2', zone: 'Line 02', value: '175', unit: '°C', icon: Utensils, status: 'Running', accent: 'orange', detail: '1 burner heating · 1.6 kW', controls: ['ON', 'OFF'] },
-  { id: 'oven-1', name: 'Oven 1', zone: 'Line 01', value: '180', unit: '°C', icon: Gauge, status: 'Running', accent: 'yellow', detail: 'Bake cycle · 3.2 kW', controls: ['ON', 'OFF'] },
-  { id: 'oven-2', name: 'Oven 2', zone: 'Line 02', value: '165', unit: '°C', icon: Gauge, status: 'Normal', accent: 'yellow', detail: 'Standby · 120 W', controls: ['ON', 'OFF'] },
-  { id: 'mixer-1', name: 'Mixer 1', zone: 'Prep station', value: '120', unit: 'RPM', icon: Activity, status: 'Running', accent: 'purple', detail: 'Mixing mode · 500 W', controls: ['ON', 'OFF'] },
-  { id: 'mixer-2', name: 'Mixer 2', zone: 'Prep station', value: '0', unit: 'RPM', icon: Activity, status: 'Normal', accent: 'purple', detail: 'Idle mode · 0 W', controls: ['ON', 'OFF'] },
-  { id: 'exhaust-fan-1', name: 'Exhaust fan 1', zone: 'Ventilation', value: '60', unit: '%', icon: Fan, status: 'Running', accent: 'green', detail: 'Airflow nominal · 1,200 CFM', controls: ['ON', 'OFF'] },
-  { id: 'exhaust-fan-2', name: 'Exhaust fan 2', zone: 'Ventilation', value: '45', unit: '%', icon: Fan, status: 'Running', accent: 'green', detail: 'Airflow nominal · 900 CFM', controls: ['ON', 'OFF'] },
-  { id: 'blender-1', name: 'Blender 1', zone: 'Prep station', value: '8,000', unit: 'RPM', icon: Zap, status: 'Normal', accent: 'cyan', detail: 'Idle mode · 0 W', controls: ['ON', 'OFF'] },
-  { id: 'blender-2', name: 'Blender 2', zone: 'Prep station', value: '6,500', unit: 'RPM', icon: Zap, status: 'Normal', accent: 'cyan', detail: 'Idle mode · 0 W', controls: ['ON', 'OFF'] },
-  { id: 'dishwasher-1', name: 'Dishwasher 1', zone: 'Back of house', value: '60', unit: '°C', icon: Waves, status: 'Running', accent: 'purple', detail: 'Washing cycle · 1.0 kW', controls: ['START', 'STOP'] },
-  { id: 'dishwasher-2', name: 'Dishwasher 2', zone: 'Back of house', value: '42', unit: '°C', icon: Waves, status: 'Normal', accent: 'purple', detail: 'Standby · 80 W', controls: ['START', 'STOP'] },
-  { id: 'sink-1', name: 'Sink 1', zone: 'Back of house', value: '30', unit: '°C', icon: Waves, status: 'Normal', accent: 'cyan', detail: 'Valve open · 4 L/min', controls: ['OPEN', 'CLOSED'] },
-  { id: 'sink-2', name: 'Sink 2', zone: 'Back of house', value: '29', unit: '°C', icon: Waves, status: 'Normal', accent: 'cyan', detail: 'Valve closed · 0 L/min', controls: ['OPEN', 'CLOSED'] },
+type Device = { id: string; name: string; type: string; value: string; unit: string; status: 'Online' | 'Offline'; icon: typeof Snowflake; color: string; detail: string; mode: string; modes: string[]; power: string; energy: string; setpoint: number; hasSetpoint: boolean; door?: string }
+
+const devices: Device[] = [
+  { id: 'freezer-1', name: 'Walk-In-Freezer-1', type: 'Cold storage', value: '-25', unit: '°C', status: 'Online', icon: Snowflake, color: 'blue', detail: 'Compressor running', mode: 'Cooling', modes: ['Cooling', 'Defrost'], power: '860 W', energy: '18 kWh', setpoint: -18, hasSetpoint: true, door: 'Closed' },
+  { id: 'freezer-2', name: 'Walk-In-Freezer-2', type: 'Cold storage', value: '-22', unit: '°C', status: 'Online', icon: Snowflake, color: 'blue', detail: 'Compressor running', mode: 'Cooling', modes: ['Cooling', 'Defrost'], power: '820 W', energy: '16 kWh', setpoint: -18, hasSetpoint: true, door: 'Closed' },
+  { id: 'stove-1', name: 'Stove-1', type: 'Cooking line', value: '190', unit: '°C', status: 'Online', icon: Utensils, color: 'orange', detail: '2 burners heating', mode: 'Heat', modes: ['Heat', 'Idle'], power: '2.4 kW', energy: '9.4 kWh', setpoint: 190, hasSetpoint: true },
+  { id: 'stove-2', name: 'Stove-2', type: 'Cooking line', value: '175', unit: '°C', status: 'Online', icon: Utensils, color: 'orange', detail: '1 burner heating', mode: 'Heat', modes: ['Heat', 'Idle'], power: '1.6 kW', energy: '7.2 kWh', setpoint: 175, hasSetpoint: true },
+  { id: 'oven-1', name: 'Oven-1', type: 'Cooking line', value: '150', unit: '°C', status: 'Online', icon: Gauge, color: 'orange', detail: 'Bake cycle active', mode: 'Bake', modes: ['Bake', 'Roast', 'Broil'], power: '3.2 kW', energy: '12 kWh', setpoint: 180, hasSetpoint: true, door: 'Closed' },
+  { id: 'oven-2', name: 'Oven-2', type: 'Cooking line', value: '50', unit: '°C', status: 'Online', icon: Gauge, color: 'orange', detail: 'Roast cycle active', mode: 'Roast', modes: ['Bake', 'Roast', 'Broil'], power: '3.2 kW', energy: '100 kWh', setpoint: 180, hasSetpoint: true, door: 'Open' },
+  { id: 'mixer-1', name: 'Mixer-1', type: 'Prep station', value: 'Off', unit: '', status: 'Offline', icon: Activity, color: 'purple', detail: 'Motor stopped', mode: 'Idle', modes: ['Idle', 'Mix'], power: '0 W', energy: '0 kWh', setpoint: 0, hasSetpoint: false },
+  { id: 'dishwasher-1', name: 'Dishwasher-1', type: 'Back of house', value: '60', unit: '°C', status: 'Offline', icon: Waves, color: 'cyan', detail: 'Cycle complete', mode: 'Idle', modes: ['Idle', 'Wash', 'Rinse'], power: '80 W', energy: '2 kWh', setpoint: 60, hasSetpoint: false },
 ]
 
-const accentStyles: Record<string, { color: string; soft: string; line: string }> = {
-  cyan: { color: '#2dd4bf', soft: 'rgba(45,212,191,.12)', line: '#2dd4bf' },
-  orange: { color: '#fb923c', soft: 'rgba(251,146,60,.12)', line: '#fb923c' },
-  blue: { color: '#60a5fa', soft: 'rgba(96,165,250,.12)', line: '#60a5fa' },
-  yellow: { color: '#facc15', soft: 'rgba(250,204,21,.12)', line: '#facc15' },
-  purple: { color: '#c084fc', soft: 'rgba(192,132,252,.12)', line: '#c084fc' },
-  green: { color: '#4ade80', soft: 'rgba(74,222,128,.12)', line: '#4ade80' },
+const navItems = [{ label: 'Overview', icon: LayoutGrid }, { label: 'Equipment', icon: ClipboardList }, { label: 'Alarms', icon: Bell, badge: '2' }, { label: 'Trends', icon: Activity }, { label: 'Events', icon: ClipboardList }, { label: 'Settings', icon: Settings }]
+
+function StatusPill({ status }: { status: Device['status'] }) { return <span className={`status-pill ${status === 'Online' ? 'online' : 'offline'}`}><i />{status}</span> }
+function Sparkline() { return <svg className="sparkline" viewBox="0 0 74 28" aria-hidden="true"><path d="M1 19 C10 20 12 7 19 15 S29 21 36 13 S45 7 51 17 S61 18 73 4" /></svg> }
+
+function DeviceCard({ device, selected, active, onSelect }: { device: Device; selected: boolean; active: boolean; onSelect: () => void }) {
+  const Icon = device.icon
+  return <button className={`device-card ${selected ? 'selected' : ''}`} onClick={onSelect}><div className="device-top"><span className={`device-icon ${device.color}`}><Icon size={24} /></span><span className="device-menu">•••</span></div><strong>{device.name}</strong><span className="device-type">{device.type}</span><div className="device-reading"><span>{active && device.value === 'Off' ? 'On' : device.value}</span><small>{device.unit}</small></div><StatusPill status={active ? 'Online' : 'Offline'} /></button>
 }
 
-function StatusDot({ status }: { status: string }) {
-  const isRunning = status === 'Running'
-  return <span className={`status-dot ${isRunning ? 'running' : ''}`} aria-label={status} />
-}
-
-function EquipmentCard({ item, isOn, onToggle }: { item: (typeof equipment)[number]; isOn: boolean; onToggle: () => void }) {
-  const Icon = item.icon
-  const accent = accentStyles[item.accent]
-  return (
-    <article className="equipment-card" style={{ '--accent': accent.color, '--accent-soft': accent.soft } as React.CSSProperties}>
-      <div className="equipment-card-top">
-        <div className="equipment-icon"><Icon size={18} strokeWidth={1.8} /></div>
-        <div className="equipment-heading">
-          <h3>{item.name}</h3>
-          <p>{item.zone}</p>
-        </div>
-        <button className="icon-button" aria-label={`More options for ${item.name}`}><MoreHorizontal size={18} /></button>
-      </div>
-      <div className="reading">
-        <span className="reading-value">{item.value}</span><span className="reading-unit">{item.unit}</span>
-      </div>
-      <div className="equipment-status"><StatusDot status={item.status} /><span>{item.status}</span><span className="status-detail">{item.detail}</span></div>
-      <div className="card-footer">
-        <div className="mini-sparkline" aria-hidden="true"><span /><span /><span /><span /><span /><span /><span /></div>
-        <div className="control-group">
-          {item.controls.map((control) => <button key={control} onClick={onToggle} className={`control-button ${control === (isOn ? item.controls[0] : item.controls[1]) ? 'selected' : ''}`}>{control}</button>)}
-        </div>
-      </div>
-    </article>
-  )
-}
-
-function TrendChart() {
-  return (
-    <div className="trend-chart" aria-label="Temperature trend chart showing oven, fryer and refrigerator readings">
-      <div className="chart-y-labels"><span>200°</span><span>150°</span><span>100°</span><span>50°</span><span>0°</span></div>
-      <svg viewBox="0 0 700 190" preserveAspectRatio="none" role="img" aria-hidden="true">
-        <defs><linearGradient id="oven-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#fb923c" stopOpacity=".24" /><stop offset="1" stopColor="#fb923c" stopOpacity="0" /></linearGradient></defs>
-        <g className="chart-grid"><line x1="0" y1="10" x2="700" y2="10" /><line x1="0" y1="52" x2="700" y2="52" /><line x1="0" y1="94" x2="700" y2="94" /><line x1="0" y1="136" x2="700" y2="136" /><line x1="0" y1="178" x2="700" y2="178" /></g>
-        <path d="M0 168 C52 165 55 162 95 164 S144 152 180 125 S212 82 257 69 S310 51 350 53 S398 45 433 39 S485 41 522 34 S570 32 605 28 S660 30 700 23 L700 190 L0 190 Z" fill="url(#oven-fill)" />
-        <path className="chart-line orange-line" d="M0 168 C52 165 55 162 95 164 S144 152 180 125 S212 82 257 69 S310 51 350 53 S398 45 433 39 S485 41 522 34 S570 32 605 28 S660 30 700 23" />
-        <path className="chart-line cyan-line" d="M0 174 C50 173 88 172 130 173 S200 171 250 172 S315 171 365 172 S430 169 480 170 S545 167 600 169 S655 166 700 166" />
-        <path className="chart-line blue-line" d="M0 178 C60 178 90 179 145 178 S220 179 270 178 S340 179 390 178 S465 177 520 178 S610 177 700 178" />
-      </svg>
-      <div className="chart-x-labels"><span>10:00</span><span>11:00</span><span>12:00</span><span>13:00</span><span>14:00</span><span>Now</span></div>
-    </div>
-  )
+function DetailPanel({ device, active, setpoint, mode, editing, draft, onToggle, onModeChange, onEditSetpoint, onDraftChange, onSaveSetpoint, onCancelSetpoint }: { device: Device; active: boolean; setpoint: number; mode: string; editing: boolean; draft: string; onToggle: () => void; onModeChange: (mode: string) => void; onEditSetpoint: () => void; onDraftChange: (value: string) => void; onSaveSetpoint: () => void; onCancelSetpoint: () => void }) {
+  const Icon = device.icon
+  const reading = device.unit ? `${device.value}${device.unit}` : (active ? 'On' : 'Off')
+  return <section className="detail-panel"><div className="detail-header"><div className="detail-title"><Icon size={27} /><h2>{device.name}</h2></div><StatusPill status={active ? 'Online' : 'Offline'} /></div><div className="detail-main"><div className="reading-display"><div className="reading-highlight"><span>{reading}</span><b>{device.unit ? 'Temperature' : 'State'}</b>{device.hasSetpoint && <p>Setpoint: <strong>{setpoint} °C</strong></p>}</div></div><div className="detail-stats"><div><Clock3 /><span>Timer<strong>1,200 s <small>(20 min)</small></strong></span></div><div><Waves /><span>Mode<select aria-label={`Change mode for ${device.name}`} value={mode} onChange={(event) => onModeChange(event.target.value)}>{device.modes.map((option) => <option key={option}>{option}</option>)}</select></span></div>{device.door && <div><Square /><span>Door<strong className={device.door === 'Open' ? 'open-value' : ''}>{device.door}</strong></span></div>}</div></div><div className="detail-metrics"><div><Zap /><span>Power<strong>{device.power}</strong></span></div><div><Layers3 /><span>Energy<strong>{device.energy}</strong></span></div></div>{editing && <div className="setpoint-editor"><label htmlFor="setpoint-input">Set temperature target</label><div><input id="setpoint-input" type="number" value={draft} onChange={(event) => onDraftChange(event.target.value)} autoFocus /><span>°C</span><button onClick={onSaveSetpoint}>Apply</button><button className="cancel-setpoint" onClick={onCancelSetpoint}>Cancel</button></div></div>}<div className="detail-actions"><button className="primary-action" onClick={onToggle}>{active ? <Square size={15} fill="currentColor" /> : <Play size={17} fill="currentColor" />} {active ? 'Turn off' : 'Turn on'}</button>{device.hasSetpoint && <button onClick={onEditSetpoint}><SlidersHorizontal size={17} /> Setpoint</button>}</div></section>
 }
 
 export default function Page() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [onStates, setOnStates] = useState<Record<string, boolean>>({
-    'walk-in-freezer-1': true, 'walk-in-freezer-2': true,
-    'stove-1': true, 'stove-2': true,
-    'oven-1': true, 'oven-2': false,
-    'mixer-1': true, 'mixer-2': false,
-    'exhaust-fan-1': true, 'exhaust-fan-2': true,
-    'blender-1': false, 'blender-2': false,
-    'dishwasher-1': true, 'dishwasher-2': false,
-    'sink-1': true, 'sink-2': true,
-  })
-  const [alarmOpen, setAlarmOpen] = useState(true)
-  const toggle = (id: string) => setOnStates((current) => ({ ...current, [id]: !current[id] }))
+  const [selectedId, setSelectedId] = useState('oven-2')
+  const [active, setActive] = useState<Record<string, boolean>>(() => Object.fromEntries(devices.map((device) => [device.id, device.status === 'Online'])))
+  const [alarmVisible, setAlarmVisible] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [setpoints, setSetpoints] = useState<Record<string, number>>(() => Object.fromEntries(devices.map((device) => [device.id, device.setpoint])))
+  const [editingSetpoint, setEditingSetpoint] = useState(false)
+  const [setpointDraft, setSetpointDraft] = useState('')
+  const [modes, setModes] = useState<Record<string, string>>(() => Object.fromEntries(devices.map((device) => [device.id, device.mode])))
+  const selected = useMemo(() => devices.find((device) => device.id === selectedId) ?? devices[0], [selectedId])
+  const toggle = (id: string) => setActive((current) => ({ ...current, [id]: !current[id] }))
+  const changeMode = (id: string, mode: string) => setModes((current) => ({ ...current, [id]: mode }))
+  const editSetpoint = () => { setSetpointDraft(String(setpoints[selected.id])); setEditingSetpoint(true) }
+  const saveSetpoint = () => { const next = Number(setpointDraft); if (setpointDraft.trim() === '' || !Number.isFinite(next) || next < -50 || next > 300) return; setSetpoints((current) => ({ ...current, [selected.id]: next })); setEditingSetpoint(false) }
+  const online = Object.values(active).filter(Boolean).length
 
-  return (
-    <main className="scada-shell">
-      <aside className={`sidebar ${isMenuOpen ? 'open' : ''}`}>
-        <div className="brand"><img className="brand-logo" src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-ZpaDIbT7xarKdw5AElI7mOf53ZKzrL.png" alt="KitchenOS" /><button className="mobile-close" onClick={() => setIsMenuOpen(false)} aria-label="Close menu"><X size={20} /></button></div>
-        <nav className="side-nav" aria-label="Primary navigation"><p className="nav-label">WORKSPACE</p><a className="active" href="#overview"><LayoutDashboard size={17} /> Overview <span className="nav-count">16</span></a><a href="#alarms"><Bell size={17} /> Alarms <span className="nav-alert">2</span></a><a href="#analytics"><Activity size={17} /> Analytics</a><p className="nav-label">SYSTEM</p><a href="#equipment"><Settings2 size={17} /> Equipment</a><a href="#settings"><ShieldCheck size={17} /> Safety & access</a></nav>
-        <div className="sidebar-bottom"><div className="facility-card"><div className="facility-avatar">KF</div><div><strong>Kitchen Floor</strong><span>North campus · Building A</span></div><ChevronDown size={15} /></div><div className="user-row"><div className="user-avatar">JD</div><div><strong>Jordan Davis</strong><span>Facility manager</span></div><MoreHorizontal size={17} /></div></div>
-      </aside>
-      {isMenuOpen && <button className="mobile-scrim" onClick={() => setIsMenuOpen(false)} aria-label="Close navigation" />}
-      <section className="workspace">
-        <header className="topbar"><button className="menu-button" onClick={() => setIsMenuOpen(true)} aria-label="Open navigation"><Menu size={21} /></button><div className="breadcrumb"><span>Kitchen Floor</span><span>/</span><strong>Overview</strong></div><div className="top-actions"><div className="live-indicator"><i /> Live data <span>·</span> 14:45:32</div><button className="icon-button"><Search size={18} /></button><button className="icon-button notification"><Bell size={18} /><b>2</b></button><div className="top-avatar">JD</div></div></header>
-        <div className="content">
-          <div className="page-heading"><div><p className="eyebrow">MONDAY, SEPTEMBER 25, 2026 <span>·</span> SHIFT A</p><h1>Good afternoon, Jordan.</h1><p className="subheading">Here&apos;s the latest from your kitchen operations.</p></div><button className="outline-button"><Activity size={16} /> Generate report</button></div>
-          <section className="overview-strip" aria-label="System overview"><div className="system-health"><div className="health-icon"><ShieldCheck size={21} /></div><div><span>System status</span><strong>All systems normal</strong></div></div><div className="overview-stat"><span>Online equipment</span><strong>12 <small>/ 16</small></strong></div><div className="overview-stat"><span>Active alarms</span><strong className="alarm-number">2</strong></div><div className="overview-stat"><span>Energy today</span><strong>42.8 <small>kWh</small></strong></div><div className="overview-updated"><span>Last sync</span><strong>Just now</strong></div></section>
-          <section id="equipment" className="section-block"><div className="section-heading"><div><h2>Equipment status</h2><p>Real-time readings from connected kitchen assets</p></div><button className="filter-button">All equipment <ChevronDown size={15} /></button></div><div className="equipment-grid">{equipment.map((item) => <EquipmentCard key={item.id} item={item} isOn={onStates[item.id]} onToggle={() => toggle(item.id)} />)}</div></section>
-          <div className="lower-grid"><section id="alarms" className="panel alarm-panel"><div className="panel-heading"><div><h2>Active alarms <span className="heading-badge">2</span></h2><p>Needs attention</p></div><button className="icon-button"><MoreHorizontal size={18} /></button></div>{alarmOpen ? <div className="alarm-list"><div className="alarm-item critical"><div className="alarm-icon"><AlertTriangle size={17} /></div><div><strong>Freezer temperature high</strong><p>Walk-in freezer · Reading is -8°C</p><span>Triggered 2 minutes ago</span></div><button onClick={() => setAlarmOpen(false)} className="ack-button">Acknowledge</button></div><div className="alarm-item warning"><div className="alarm-icon"><AlertTriangle size={17} /></div><div><strong>Refrigerator door open</strong><p>Cold storage · Door has been open</p><span>Triggered 2 minutes ago</span></div><button onClick={() => setAlarmOpen(false)} className="ack-button">Acknowledge</button></div></div> : <div className="empty-state"><ShieldCheck size={22} /> All alarms acknowledged</div>}</section><section id="analytics" className="panel trend-panel"><div className="panel-heading"><div><h2>Temperature trend</h2><p>Last 5 hours across monitored assets</p></div><button className="filter-button">Last 5 hours <ChevronDown size={15} /></button></div><div className="legend"><span><i className="legend-dot orange" /> Oven</span><span><i className="legend-dot cyan" /> Refrigerator</span><span><i className="legend-dot blue" /> Freezer</span></div><TrendChart /></section></div>
-          <footer className="footer"><span><CircleHelp size={14} /> Need help? Contact support</span><span>KitchenOS v2.4.1 <i /> Secure connection</span></footer>
-        </div>
-      </section>
-    </main>
-  )
+  return <main className="app-shell"><aside className={`sidebar ${menuOpen ? 'open' : ''}`}><div className="brand"><img src="/kitchenos-logo.svg" alt="KitchenOS" /><button className="close-menu" onClick={() => setMenuOpen(false)}><X size={20} /></button></div><nav>{navItems.map(({ label, icon: Icon, badge }) => <a className={label === 'Overview' ? 'active' : ''} href={`#${label.toLowerCase()}`} key={label}><Icon size={21} /><span>{label}</span>{badge && <em>{badge}</em>}</a>)}</nav><div className="sidebar-foot"><span className="version-dot" /> KitchenOS v1.0</div></aside>{menuOpen && <button className="scrim" onClick={() => setMenuOpen(false)} aria-label="Close menu" />}<section className="main-area"><header className="topbar"><button className="mobile-menu" onClick={() => setMenuOpen(true)}><Menu size={22} /></button><div className="top-brand"><img src="/kitchenos-logo.svg" alt="KitchenOS" /></div><div className="system-normal"><i /> System Normal</div><div className="top-meta"><span><CalendarDays size={20} /> Nov 26, 2026</span><span><Clock3 size={20} /> 10:24:32 AM</span><span className="operator"><Power size={19} /> Operator <ChevronDown size={17} /></span></div></header><div className="page-content"><section className="kpi-row"><div className="kpi"><span className="kpi-icon"><Thermometer /></span><div><b>21 °C</b><small>Kitchen Temperature</small></div><Sparkline /></div><div className="kpi"><span className="kpi-icon"><Fan /></span><div><b>1,350 CFM</b><small>Exhaust Airflow</small></div><Sparkline /></div><div className="kpi"><span className="kpi-icon"><Zap /></span><div><b>12.4 kW</b><small>Live Power Load</small></div><Sparkline /></div><div className="kpi"><span className="kpi-icon"><Layers3 /></span><div><b>{online} / 8</b><small>Equipment Online</small></div><Sparkline /></div></section><div className="dashboard-grid"><section id="equipment" className="equipment-section"><div className="section-title"><div><h1><LayoutGrid size={22} /> Equipment Overview</h1><p>Monitor and control connected kitchen assets</p></div><button>View All <span>→</span></button></div><div className="devices-grid">{devices.map((device) => <DeviceCard key={device.id} device={device} selected={device.id === selectedId} active={active[device.id]} onSelect={() => setSelectedId(device.id)} />)}</div></section><DetailPanel device={selected} active={active[selected.id]} setpoint={setpoints[selected.id]} mode={modes[selected.id]} editing={editingSetpoint} draft={setpointDraft} onToggle={() => toggle(selected.id)} onModeChange={(mode) => changeMode(selected.id, mode)} onEditSetpoint={editSetpoint} onDraftChange={setSetpointDraft} onSaveSetpoint={saveSetpoint} onCancelSetpoint={() => setEditingSetpoint(false)} /></div><div className="bottom-grid"><section id="alarms" className="info-panel"><div className="panel-title"><h2><AlertTriangle size={20} /> Active Alarms <span>2</span></h2><button>View All →</button></div>{alarmVisible && <div className="alarm-row"><AlertTriangle className="danger" size={22} /><b>Oven-1</b><span>Over Temperature</span><time>2 min ago</time></div>}<div className="alarm-row"><AlertTriangle className="danger" size={22} /><b>Dishwasher-1</b><span>Cycle Fault</span><time>5 min ago</time><button onClick={() => setAlarmVisible(false)} className="ack">Acknowledge</button></div>{!alarmVisible && <div className="cleared"><Power size={18} /> Alarms acknowledged</div>}</section><section className="info-panel events"><div className="panel-title"><h2><ClipboardList size={20} /> Recent Events</h2><button>View All →</button></div><div className="event-row"><i /> <span>Oven-2 mode changed to Roast</span><time>10:20 AM</time></div><div className="event-row"><i /> <span>Walk-In-Freezer-1 temperature -25 °C</span><time>10:18 AM</time></div></section></div><footer><span><span className="online-dot" /> KitchenOS v1.0</span><span>Last updated just now · <strong>Connected</strong></span></footer></div></section></main>
 }

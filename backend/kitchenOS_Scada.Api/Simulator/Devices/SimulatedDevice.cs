@@ -23,6 +23,7 @@ public abstract class SimulatedDevice : ISimulatedDevice
     protected JsonElement _json;
 
     public string DeviceName { get; set; }
+    public virtual int RefreshRate { get; } = 50000;
 
 
     public SimulatedDevice(DeviceTypes deviceType)

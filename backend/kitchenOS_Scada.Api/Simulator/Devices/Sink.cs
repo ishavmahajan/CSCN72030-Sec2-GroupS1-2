@@ -14,6 +14,9 @@ public class Sink : SimulatedDevice
     private readonly List<string> valveChoices = new();
     private bool valveSetByCommand;
 
+    public override int RefreshRate { get; } = 91000;
+
+
     public Sink() : base( DeviceTypes.Sink)
     {
     }

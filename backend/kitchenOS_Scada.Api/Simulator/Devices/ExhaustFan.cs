@@ -11,6 +11,7 @@ public class ExhaustFan : SimulatedDevice
     public string PowerState { get; set; } = "off";
     public double Power { get; set; }
     public double Energy { get; set; }
+    public override int RefreshRate { get; } = 31000;
 
     public ExhaustFan() : base( DeviceTypes.ExhaustFan)
     {

@@ -12,6 +12,7 @@ public class Oven : SimulatedDevice
     public string Mode { get; set; } = "bake";
     public double Power { get; set; }
     public double Energy { get; set; }
+    public override int RefreshRate { get; } = 71000;
 
     public Oven() : base( DeviceTypes.Oven)
     {

@@ -10,6 +10,7 @@ public class Mixer : SimulatedDevice
     public double Power { get; set; }
     public double Energy { get; set; }
 
+    public override int RefreshRate { get; } = 46000;
 
     private readonly List<double> speedChoices = new();
     private bool speedSetByCommand;
