@@ -70,7 +70,6 @@ app.Map("/ws", async (HttpContext context, WebSocketClientNotifier notifier) =>
             WebSocketReceiveResult result = await socket.ReceiveAsync(
                 new ArraySegment<byte>(buffer),
                 context.RequestAborted);
-
             if (result.MessageType == WebSocketMessageType.Close)
             {
                 await socket.CloseOutputAsync(

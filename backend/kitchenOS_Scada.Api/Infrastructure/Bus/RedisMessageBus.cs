@@ -24,6 +24,7 @@ public class RedisMessageBus : IMessageBus
         ISubscriber subscriber = _connectionMultiplexer.GetSubscriber();
         
         subscriber.PublishAsync(RedisChannel.Literal(channel), jsonString);
+        
         return _notifier.Notify(message as IEvent, cancellationToken);
        
     }

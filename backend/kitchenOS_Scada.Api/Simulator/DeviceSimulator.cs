@@ -1,6 +1,8 @@
 using System.Text.Json;
 using kitchenOS_Scada.Api.Enums;
+using kitchenOS_Scada.Api.Events;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
+using kitchenOS_Scada.Api.Messaging;
 using kitchenOS_Scada.Api.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Simulator;
@@ -83,7 +85,7 @@ public class DeviceSimulator : IDeviceSimulator
                     Console.WriteLine($"Updating device properties and publishing telemetry for {device.DeviceName} every {device.RefreshRate} ms...");
 
                     device.refreshFromJson();
-                    //Todo:  await PublishTelemetry(device, cancellationToken);
+                    await PublishTelemetry(device, cancellationToken);
 
                     await Task.Delay(device.RefreshRate, cancellationToken);
                 }
@@ -189,11 +191,11 @@ public class DeviceSimulator : IDeviceSimulator
         {
             EventName = "telemetry",
             DeviceId = device.DeviceId.ToString(),
-            DeviceType = device.DeviceType.ToFriendlyString(),
+            DeviceType = device.DeviceType,
             Timestamp = timestamp,
             Message = new TelemetryBody
             {
-                Timestamp = timestamp,
+                Timestamp = DateTime.UtcNow,
                 Values = device.ReadPoints().Select(point => new TelemetryPoint
                 {
                     Component = point.Component,
@@ -220,11 +222,11 @@ public class DeviceSimulator : IDeviceSimulator
         {
             EventName = "command_result",
             DeviceId = device.DeviceId.ToString(),
-            DeviceType = device.DeviceType.ToFriendlyString(),
+            DeviceType = device.DeviceType,
             Timestamp = timestamp,
             Message = new CommandResultBody
             {
-                Timestamp = timestamp,
+                Timestamp = DateTime.UtcNow,
                 CommandId = commandId,
                 Status = status,
                 Reason = reason
@@ -262,18 +264,18 @@ public class CommandArguments
     public string? Mode { get; set; }
 }
 
-public class EventEnvelope
+public class EventEnvelope : IEvent
 {
     public string EventName { get; set; } = "";
     public string DeviceId { get; set; } = "";
-    public string DeviceType { get; set; } = "";
+    public DeviceTypes DeviceType { get; set; }
     public string Timestamp { get; set; } = "";
-    public object Message { get; set; } = new();
+    public IMessage Message { get; set; } = default!;
 }
 
-public class TelemetryBody
+public class TelemetryBody : IMessage
 {
-    public string Timestamp { get; set; } = "";
+    public DateTime Timestamp { get; set; }
     public List<TelemetryPoint> Values { get; set; } = [];
 }
 
@@ -285,9 +287,9 @@ public class TelemetryPoint
     public string? Unit { get; set; }
 }
 
-public class CommandResultBody
+public class CommandResultBody : IMessage
 {
-    public string Timestamp { get; set; } = "";
+    public DateTime Timestamp { get; set; }
     public string CommandId { get; set; } = "";
     public string Status { get; set; } = "";
     public string? Reason { get; set; }
