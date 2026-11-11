@@ -1,4 +1,5 @@
 namespace kitchenOS_Scada.Api.Infrastructure.Bus;
+using kitchenOS_Scada.Api.Notifier;
 
 public interface IMessageBus
 {
