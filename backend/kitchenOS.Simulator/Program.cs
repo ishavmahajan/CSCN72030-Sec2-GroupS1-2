@@ -5,6 +5,7 @@ using kitchenOS_Scada.Contract.Infrastructure.Bus;
 using kitchenOS.Simulator.Bus;
 using StackExchange.Redis;
 using kitchenOS.Simulator;
+Console.WriteLine("Starting kitchenOS Simulator...");
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -19,6 +20,7 @@ builder.Services.AddSingleton<IMessageBus>(services =>
     services.GetRequiredService<RedisMessageBus>());
 builder.Services.AddSingleton<DeviceSimulator>();
 builder.Services.AddHostedService<SimulatorWorker>();
+
 
 await builder.Build().RunAsync();
 

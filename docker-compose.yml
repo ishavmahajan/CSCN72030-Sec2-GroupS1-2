@@ -35,6 +35,28 @@ services:
 
     restart: unless-stopped
 
+  simulator:
+    build:
+      context: ./backend
+      dockerfile: kitchenOS.Simulator/Dockerfile
+
+    container_name: kitchen-os-simulator
+
+    working_dir: /src/kitchenOS.Simulator
+
+    volumes:
+      - ./backend:/src
+
+    depends_on:
+      - redis
+
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+      ConnectionStrings__Redis: redis:6379
+
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
