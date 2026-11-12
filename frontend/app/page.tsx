@@ -102,7 +102,7 @@ function Sparkline() { return <svg className="sparkline" viewBox="0 0 74 28" ari
 
 function DeviceCard({ device, selected, active, onSelect }: { device: Device; selected: boolean; active: boolean; onSelect: () => void }) {
   const Icon = device.icon
-  return <button className={`device-card ${selected ? 'selected' : ''}`} onClick={onSelect}><div className="device-top"><span className={`device-icon ${device.color}`}><Icon size={24} /></span><span className="device-menu">•••</span></div><strong>{device.name}</strong><span className="device-type">{device.type}</span><div className="device-reading"><span>{active && device.value === 'Off' ? 'On' : device.value}</span><small>{device.unit}</small></div><StatusPill status={active ? 'Online' : 'Offline'} /></button>
+  return <button className={`device-card ${selected ? 'selected' : ''}`} onClick={onSelect}><div className="device-top"><span className={`device-icon ${device.color}`}><Icon size={24} /></span><span className="device-menu">•••</span></div><strong>{device.name}</strong><span className="device-type">{device.type}</span><div key={`${device.value}-${device.power}-${device.energy}`} className="device-reading"><span>{active && device.value === 'Off' ? 'On' : device.value}</span><small>{device.unit}</small></div><StatusPill status={active ? 'Online' : 'Offline'} /></button>
 }
 
 function DetailPanel({ device, active, setpoint, mode, onToggle, onModeChange, onEditSetpoint }: { device: Device; active: boolean; setpoint: number; mode: string; onToggle: () => void; onModeChange: (mode: string) => void; onEditSetpoint: () => void }) {

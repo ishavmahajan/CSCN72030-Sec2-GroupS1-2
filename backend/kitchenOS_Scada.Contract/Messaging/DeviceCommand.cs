@@ -6,7 +6,7 @@ public class DeviceCommand
 {
     public string CommandId { get; set; } = "";
     public string CommandName { get; set; } = "";
-    public Guid DeviceId { get; set; } = Guid.Empty;
+    public string DeviceId { get; set; } = "";
     public string Timestamp { get; set; } = "";
     public CommandArguments? Arguments { get; set; }
 }

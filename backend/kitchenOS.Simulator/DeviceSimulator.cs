@@ -38,7 +38,8 @@ public class DeviceSimulator : IDeviceSimulator
             SimulatedDevice device = SimulatedDevice.Create(deviceType, dummyData);
             device.setDeviceName(item.GetProperty("deviceName").GetString() ?? "")
                 .setDescription(item.GetProperty("description").GetString() ?? "")
-                .setJson(dummyData.Clone());
+                .setJson(dummyData.Clone())
+                .setDeviceId(item.GetProperty("deviceId").GetString() ?? Guid.NewGuid().ToString());
             // device.Description = item.GetProperty("description").GetString() ?? "No description available";
             _devices.Add(device);
         }

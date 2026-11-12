@@ -5,19 +5,22 @@ namespace kitchenOS_Scada.Api.Simulator.Devices;
 
 public interface ISimulatedDevice
 {
-    Guid DeviceId { get; }
+    string DeviceId { get; }
     DeviceTypes DeviceType { get; }
     string Description { get; }
 
 
     void UpdateProperties(Random random);
     ISimulatedDevice setJson(JsonElement json);
+    ISimulatedDevice setDeviceId(string deviceId);
     List<PointReading> ReadPoints();
     bool TrySetValue<T>(string name, T value, string? component, out string? reason);
     bool StartComponent(string? component);
     bool StopComponent(string? component);
     bool TrySetMode(string mode, string? component, out string? reason);
     abstract public void refreshFromJson();
+
+
 }
 public abstract class SimulatedDevice : ISimulatedDevice
 {
@@ -30,14 +33,13 @@ public abstract class SimulatedDevice : ISimulatedDevice
 
     public SimulatedDevice(DeviceTypes deviceType)
     {
-        DeviceId = Guid.NewGuid();
         DeviceType = deviceType;
         DeviceName = "N/A";
         Description = "No description available";
     }
 
     abstract public void refreshFromJson();
-    public Guid DeviceId { get; }
+    public string DeviceId { get; set; }
     public DeviceTypes DeviceType { get; }
 
     public virtual void UpdateProperties(Random random)
@@ -75,6 +77,12 @@ public abstract class SimulatedDevice : ISimulatedDevice
     {
         reason = "setMode is not accepted";
         return false;
+    }
+
+    public ISimulatedDevice setDeviceId(string deviceId)
+    {
+        DeviceId = deviceId;
+        return this;
     }
 
     public static SimulatedDevice Create(string deviceType, JsonElement json)
