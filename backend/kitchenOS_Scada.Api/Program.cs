@@ -10,6 +10,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:3020")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 string redisConnection =
     builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
 
@@ -35,6 +45,7 @@ simulator.Load(devicesJson, simulationJson, app.Services.GetRequiredService<IMes
 await simulator.Start();
 
 app.UseWebSockets();
+app.UseCors("Frontend");
 app.UseHttpsRedirection();
 
 if (app.Environment.IsDevelopment())
@@ -103,6 +114,7 @@ app.MapGet("/devices", () =>
         d.DeviceId,
         d.DeviceType,
         d.DeviceName,
+        d.Description,
         readPoints = d.ReadPoints()
     }));
 }).WithName("GetDevices");

@@ -6,6 +6,7 @@ namespace kitchenOS_Scada.Api.Simulator.Devices;
 public class Mixer : SimulatedDevice
 {
     public string Motor { get; set; } = "off";
+    public string Mode { get; set; } = "idle";
     public double Speed { get; set; }
     public double Power { get; set; }
     public double Energy { get; set; }
@@ -24,6 +25,7 @@ public class Mixer : SimulatedDevice
         var mixer = new Mixer();
         Random random = new Random();
         mixer.Motor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "motor"));
+        mixer.Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"), mixer.Mode, false);
         mixer.Speed = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "speed"), mixer.Speed, false);
         mixer.Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), mixer.Power, false);
         mixer.Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), mixer.Energy, false);
@@ -36,6 +38,7 @@ public class Mixer : SimulatedDevice
         Random random = new Random();
         JsonElement json = _json;
         Motor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "motor"));
+        Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"), Mode, false);
         Speed = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "speed"), Speed, false);
         Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
         Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), Energy, false);
@@ -51,6 +54,7 @@ public class Mixer : SimulatedDevice
         return new List<PointReading>
         {
             new PointReading("motor", Motor, null, null),
+            new PointReading("mode", Mode, null, null),
             new PointReading("speed", Speed, "rpm", null),
             new PointReading("power", Power, "W", null),
             new PointReading("energy", Energy, "kWh", null)

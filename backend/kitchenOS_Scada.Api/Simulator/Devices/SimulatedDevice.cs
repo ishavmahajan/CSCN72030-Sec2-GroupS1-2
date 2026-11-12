@@ -7,6 +7,7 @@ public interface ISimulatedDevice
 {
     Guid DeviceId { get; }
     DeviceTypes DeviceType { get; }
+    string Description { get; }
 
 
     void UpdateProperties(Random random);
@@ -23,6 +24,7 @@ public abstract class SimulatedDevice : ISimulatedDevice
     protected JsonElement _json;
 
     public string DeviceName { get; set; }
+    public string Description { get; private set; }
     public virtual int RefreshRate { get; } = 50000;
 
 
@@ -31,6 +33,7 @@ public abstract class SimulatedDevice : ISimulatedDevice
         DeviceId = Guid.NewGuid();
         DeviceType = deviceType;
         DeviceName = "N/A";
+        Description = "No description available";
     }
 
     abstract public void refreshFromJson();
@@ -91,6 +94,12 @@ public abstract class SimulatedDevice : ISimulatedDevice
     public SimulatedDevice setDeviceName(string deviceName)
     {
         DeviceName = deviceName;
+        return this;
+    }
+
+    public SimulatedDevice setDescription(string description)
+    {
+        Description = description;
         return this;
     }
     

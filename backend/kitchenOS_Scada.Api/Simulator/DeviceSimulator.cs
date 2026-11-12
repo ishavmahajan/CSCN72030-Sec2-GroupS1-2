@@ -33,7 +33,10 @@ public class DeviceSimulator : IDeviceSimulator
             string deviceType = item.GetProperty("deviceType").GetString() ?? "";
             JsonElement dummyData = parsedSimulationRoot.GetProperty(deviceType);
             SimulatedDevice device = SimulatedDevice.Create(deviceType, dummyData);
-            device.setDeviceName(item.GetProperty("deviceName").GetString() ?? "").setJson(dummyData.Clone());
+            device.setDeviceName(item.GetProperty("deviceName").GetString() ?? "")
+                .setDescription(item.GetProperty("description").GetString() ?? "")
+                .setJson(dummyData.Clone());
+            device.Description = item.GetProperty("description").GetString() ?? "No description available";
             _devices.Add(device);
         }
     }
