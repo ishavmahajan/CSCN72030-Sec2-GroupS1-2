@@ -2,7 +2,7 @@
 
 KitchenOS SCADA is an ASP.NET Core API (`.NET 10`) for the KitchenOS supervisory control system. The system design is in [docs/design.md](docs/design.md). Development runs inside Docker so the API, SDK, and file watcher are the same on every machine.
 
-The API listens on [http://localhost:8080](http://localhost:8080). In Development it also serves an OpenAPI document at [http://localhost:8080/openapi/v1.json](http://localhost:8080/openapi/v1.json).
+The API listens on [http://localhost:8080](http://localhost:8080). In Development it also serves an OpenAPI document at [http://localhost:8080/openapi/v1.json](http://localhost:8080/openapi/v1.json). The project split and runtime topology are documented in [docs/project-architecture.md](docs/project-architecture.md).
 
 ## Prerequisites
 
@@ -134,6 +134,9 @@ docker compose up -d
 
 ```text
 backend/kitchenOS_Scada.Api/   ASP.NET Core API
+backend/kitchenOS.Simulator/    Background simulator worker
+backend/kitchenOS_Scada.Contract/ Shared message and event contracts
+backend/kitchenOS_Scada.Api.Tests/ API and simulator tests
 backend/kitchenOS_Scada.slnx   Solution file
 docker-compose.yml             Development stack
 Makefile                       Shortcuts for Docker Compose
