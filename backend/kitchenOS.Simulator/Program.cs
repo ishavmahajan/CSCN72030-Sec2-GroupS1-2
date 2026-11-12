@@ -1,40 +1,24 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
-using kitchenOS_Scada.Api.Simulator;
+using kitchenOS.Simulator.Bus;
 using StackExchange.Redis;
+using kitchenOS.Simulator;
 
-string redisConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ?? "localhost:6379";
-using IConnectionMultiplexer connection = await ConnectionMultiplexer.ConnectAsync(redisConnection);
+var builder = Host.CreateApplicationBuilder(args);
 
-var simulator = new DeviceSimulator();
-string devicesJson = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "SimulatorFiles", "devices.json"));
-string simulationJson = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "SimulatorFiles", "simulation.json"));
+string redisConnection =
+    builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
 
-simulator.Load(devicesJson, simulationJson, new RedisEventPublisher(connection));
-await simulator.Start();
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    ConnectionMultiplexer.Connect(redisConnection));
 
-await Task.Delay(Timeout.Infinite);
+builder.Services.AddSingleton<RedisMessageBus>();
+builder.Services.AddSingleton<IMessageBus>(services =>
+    services.GetRequiredService<RedisMessageBus>());
+builder.Services.AddSingleton<DeviceSimulator>();
+builder.Services.AddHostedService<SimulatorWorker>();
 
-internal sealed class RedisEventPublisher : IMessageBus
-{
-    private readonly ISubscriber _subscriber;
+await builder.Build().RunAsync();
 
-    public RedisEventPublisher(IConnectionMultiplexer connection)
-    {
-        _subscriber = connection.GetSubscriber();
-    }
-
-    public Task PublishAsync<T>(string channel, T message, CancellationToken cancellationToken = default)
-        where T : class
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return _subscriber.PublishAsync(
-            RedisChannel.Literal(channel),
-            System.Text.Json.JsonSerializer.Serialize(message));
-    }
-
-    public void Subscribe<T>(string channel, Func<T, CancellationToken, Task> handler)
-        where T : class
-    {
-        throw new NotSupportedException("The simulator only publishes events.");
-    }
-}

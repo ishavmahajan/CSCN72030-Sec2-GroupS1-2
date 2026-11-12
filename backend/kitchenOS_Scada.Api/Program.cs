@@ -5,6 +5,10 @@ using kitchenOS_Scada.Api.Notifier;
 using StackExchange.Redis;
 using kitchenOS_Scada.Api.Simulator.Devices;
 using kitchenOS_Scada.Api.Helpers;
+using kitchenOS.Simulator;
+using kitchenOS_Scada.Api.Infrastructure.Bus;
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,8 +45,8 @@ var app = builder.Build();
 var simulator = new DeviceSimulator();
 string devicesJson = FileHelper.GetSimulationData("devices.json");
 string simulationJson = FileHelper.GetSimulationData("simulation.json");
+// Load the devices. To be replaced with a database call in the future.
 simulator.Load(devicesJson, simulationJson, app.Services.GetRequiredService<IMessageBus>());
-await simulator.Start();
 
 app.UseWebSockets();
 app.UseCors("Frontend");

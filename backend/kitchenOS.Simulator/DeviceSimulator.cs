@@ -5,7 +5,7 @@ using kitchenOS_Scada.Contract.Infrastructure.Bus;
 using kitchenOS_Scada.Contract.Messaging;
 using kitchenOS_Scada.Api.Simulator.Devices;
 
-namespace kitchenOS_Scada.Api.Simulator;
+namespace kitchenOS.Simulator;
 
 public class DeviceSimulator : IDeviceSimulator
 {
@@ -17,9 +17,12 @@ public class DeviceSimulator : IDeviceSimulator
     private IMessageBus? _messageBus;
     private bool _running;
 
+   
+    
+
     public void Load(string devicesString, string simulationString, IMessageBus messageBus)
     {
-        _messageBus = messageBus;
+        _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
         _devices.Clear();
 
         using var parsedDevices = JsonDocument.Parse(devicesString);
@@ -36,7 +39,7 @@ public class DeviceSimulator : IDeviceSimulator
             device.setDeviceName(item.GetProperty("deviceName").GetString() ?? "")
                 .setDescription(item.GetProperty("description").GetString() ?? "")
                 .setJson(dummyData.Clone());
-            device.Description = item.GetProperty("description").GetString() ?? "No description available";
+            // device.Description = item.GetProperty("description").GetString() ?? "No description available";
             _devices.Add(device);
         }
     }

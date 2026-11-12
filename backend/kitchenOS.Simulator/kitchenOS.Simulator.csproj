@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\kitchenOS_Scada.Contract\kitchenOS_Scada.Contract.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageReference Include="StackExchange.Redis" Version="3.3.1" />
   </ItemGroup>
 

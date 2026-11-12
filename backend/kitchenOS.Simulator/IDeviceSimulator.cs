@@ -1,7 +1,7 @@
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Simulator.Devices;
 
-namespace kitchenOS_Scada.Api.Simulator;
+namespace kitchenOS.Simulator;
 
 public interface IDeviceSimulator
 {
