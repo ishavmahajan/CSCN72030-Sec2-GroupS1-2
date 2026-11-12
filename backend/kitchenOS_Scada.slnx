@@ -1,4 +1,6 @@
 <Solution>
+  <Project Path="kitchenOS_Scada.Contract/kitchenOS_Scada.Contract.csproj" />
   <Project Path="kitchenOS_Scada.Api.Tests/kitchenOS_Scada.Api.Tests.csproj" />
   <Project Path="kitchenOS_Scada.Api/kitchenOS_Scada.Api.csproj" />
+  <Project Path="kitchenOS.Simulator/kitchenOS.Simulator.csproj" />
 </Solution>

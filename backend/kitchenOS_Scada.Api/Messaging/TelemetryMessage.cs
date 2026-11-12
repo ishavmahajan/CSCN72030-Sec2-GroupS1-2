@@ -1,4 +1,5 @@
-using kitchenOS_Scada.Api.Enums;
+using kitchenOS_Scada.Contract.Enums;
+using kitchenOS_Scada.Contract.Messaging;
 namespace kitchenOS_Scada.Api.Messaging;
 public class TelemetryMessage: IMessage
 {

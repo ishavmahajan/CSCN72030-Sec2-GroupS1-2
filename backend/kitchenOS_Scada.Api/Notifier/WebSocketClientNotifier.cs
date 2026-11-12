@@ -1,8 +1,8 @@
-using kitchenOS_Scada.Api.Enums;
+using kitchenOS_Scada.Contract.Enums;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Json;
-using kitchenOS_Scada.Api.Events;
+using kitchenOS_Scada.Contract.Events;
 
 namespace kitchenOS_Scada.Api.Notifier;
 

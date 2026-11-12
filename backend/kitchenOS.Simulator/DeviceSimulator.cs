@@ -1,8 +1,8 @@
 using System.Text.Json;
-using kitchenOS_Scada.Api.Enums;
-using kitchenOS_Scada.Api.Events;
-using kitchenOS_Scada.Api.Infrastructure.Bus;
-using kitchenOS_Scada.Api.Messaging;
+using kitchenOS_Scada.Contract.Enums;
+using kitchenOS_Scada.Contract.Events;
+using kitchenOS_Scada.Contract.Infrastructure.Bus;
+using kitchenOS_Scada.Contract.Messaging;
 using kitchenOS_Scada.Api.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Simulator;

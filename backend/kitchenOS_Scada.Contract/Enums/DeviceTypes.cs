@@ -1,4 +1,5 @@
-namespace kitchenOS_Scada.Api.Enums;
+namespace kitchenOS_Scada.Contract.Enums;
+
 public enum DeviceTypes
 {
     WalkInFreezer,
@@ -6,7 +7,7 @@ public enum DeviceTypes
     Oven,
     Mixer,
     ExhaustFan,
-    Blender ,
+    Blender,
     Dishwasher,
     Sink
 }

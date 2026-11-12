@@ -1,4 +1,4 @@
-using kitchenOS_Scada.Api.Infrastructure.Bus;
+using kitchenOS_Scada.Contract.Infrastructure.Bus;
 
 namespace kitchenOS_Scada.Api.Tests.Simulator;
 

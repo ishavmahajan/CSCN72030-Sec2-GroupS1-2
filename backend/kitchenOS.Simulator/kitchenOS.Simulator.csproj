@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\kitchenOS_Scada.Contract\kitchenOS_Scada.Contract.csproj" />
+    <PackageReference Include="StackExchange.Redis" Version="3.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="SimulatorFiles\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

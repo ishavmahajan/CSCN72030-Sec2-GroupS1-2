@@ -1,5 +1,5 @@
 using System.Net.WebSockets;
-using kitchenOS_Scada.Api.Infrastructure.Bus;
+using kitchenOS_Scada.Contract.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Simulator;
 using kitchenOS_Scada.Api.Notifier;
 using StackExchange.Redis;

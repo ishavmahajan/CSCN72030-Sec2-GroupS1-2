@@ -1,0 +1,61 @@
+
+[
+  {
+    "deviceName": "Walk-In-Freezer-1",
+    "deviceType": "WALK_IN_FREEZER",
+    "description": "Side freezer for storing frozen ingredients. Temperature should be maintained at -18°C."
+  },
+  {
+    "deviceName": "Walk-In-Freezer-2",
+    "deviceType": "WALK_IN_FREEZER",
+    "description": "Side freezer for storing frozen ingredients. Temperature should be maintained at -18°C."
+  },
+
+  {
+    "deviceName": "Oven-1",
+    "deviceType": "OVEN",
+    "description": "Commercial oven for baking and roasting."
+  },
+  {
+    "deviceName": "Oven-2",
+    "deviceType": "OVEN",
+    "description": "Commercial oven for baking and roasting."
+  },
+  {
+    "deviceName": "Mixer-1",
+    "deviceType": "MIXER",
+    "description": "Commercial mixer for food preparation."
+  },
+  {
+    "deviceName": "Mixer-2",
+    "deviceType": "MIXER",
+    "description": "Commercial mixer for food preparation."
+  },
+  {
+    "deviceName": "Exhaust-Fan-1",
+    "deviceType": "EXHAUST_FAN",
+    "description": "Exhaust fan for removing smoke and odors."
+  },
+  {
+    "deviceName": "Exhaust-Fan-2",
+    "deviceType": "EXHAUST_FAN",
+    "description": "Exhaust fan for removing smoke and odors."
+  },
+  {
+    "deviceName": "Blender-1",
+    "deviceType": "BLENDER",
+    "description": "Commercial blender for food preparation."
+  },
+
+  {
+    "deviceName": "Dishwasher-1",
+    "deviceType": "DISHWASHER",
+    "description": "Commercial dishwasher for cleaning dishes."
+  },
+
+  {
+    "deviceName": "Sink-1",
+    "deviceType": "SINK",
+    "description": "Commercial sink for washing hands and equipment."
+  }
+]

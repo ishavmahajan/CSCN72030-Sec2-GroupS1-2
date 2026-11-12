@@ -1,4 +1,4 @@
-using kitchenOS_Scada.Api.Events;
+using kitchenOS_Scada.Contract.Events;
 
 namespace kitchenOS_Scada.Api.Notifier;
 
