@@ -1,5 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using kitchenOS_Scada.Api.Simulator;
+using kitchenOS.Simulator;
+using kitchenOS_Scada.Contract.Events;
 
 namespace kitchenOS_Scada.Api.Tests.Simulator;
 
@@ -10,7 +11,7 @@ namespace kitchenOS_Scada.Api.Tests.Simulator;
 public class DeviceSimulatorPublishingTests
 {
     [TestMethod]
-    public async Task PublishEvents_PublishesTelemetryForEveryLoadedDevice()
+    public async Task PublishEvents_PublishesTelemetryForEachLoadedDevice()
     {
         var simulator = new DeviceSimulator();
         var messageBus = new RecordingMessageBus();

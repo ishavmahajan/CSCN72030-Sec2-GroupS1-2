@@ -1,5 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using kitchenOS_Scada.Api.Simulator;
+using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Tests.Simulator;
