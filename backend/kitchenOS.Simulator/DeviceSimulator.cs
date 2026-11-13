@@ -9,9 +9,6 @@ namespace kitchenOS.Simulator;
 
 public class DeviceSimulator : IDeviceSimulator
 {
-    public const string EventsChannel = "kitchenos:events";
-    public const string CommandsChannel = "kitchenos:commands";
-
     private readonly List<SimulatedDevice> _devices = [];
     private readonly Random _random = new();
     private IMessageBus? _messageBus;
@@ -221,7 +218,7 @@ public class DeviceSimulator : IDeviceSimulator
             }
         };
 
-        return Bus.PublishAsync(EventsChannel, envelope, cancellationToken);
+        return Bus.PublishAsync(MessageChannels.TelemetryEvents, envelope, cancellationToken);
     }
 
 
@@ -248,7 +245,7 @@ public class DeviceSimulator : IDeviceSimulator
             }
         };
 
-        return Bus.PublishAsync(EventsChannel, envelope, cancellationToken);
+        return Bus.PublishAsync(MessageChannels.CommandResultEvents, envelope, cancellationToken);
     }
 
     private IMessageBus Bus => _messageBus ?? throw new InvalidOperationException("Call Load before publishing.");

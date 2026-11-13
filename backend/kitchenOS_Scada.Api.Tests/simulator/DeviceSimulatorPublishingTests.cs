@@ -1,6 +1,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using kitchenOS.Simulator;
 using kitchenOS_Scada.Contract.Events;
+using kitchenOS_Scada.Contract.Infrastructure.Bus;
 
 namespace kitchenOS_Scada.Api.Tests.Simulator;
 
@@ -29,7 +30,7 @@ public class DeviceSimulatorPublishingTests
         await simulator.PublishEvents();
 
         Assert.AreEqual(2, messageBus.Messages.Count);
-        Assert.IsTrue(messageBus.Messages.All(message => message.Channel == DeviceSimulator.EventsChannel));
+        Assert.IsTrue(messageBus.Messages.All(message => message.Channel == MessageChannels.TelemetryEvents));
         foreach (var message in messageBus.Messages)
         {
             var envelope = message.Message as EventEnvelope;

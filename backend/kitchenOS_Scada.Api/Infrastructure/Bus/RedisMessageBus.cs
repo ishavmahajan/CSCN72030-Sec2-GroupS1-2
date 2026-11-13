@@ -1,18 +1,14 @@
 using System.Text.Json;
 using StackExchange.Redis;
-using kitchenOS_Scada.Api.Notifier;
-using kitchenOS_Scada.Contract.Events;
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
 namespace kitchenOS_Scada.Api.Infrastructure.Bus;
 
 public class RedisMessageBus : IMessageBus
 {
     private readonly IConnectionMultiplexer _connectionMultiplexer;
-    private readonly IClientNotifier _notifier;
-    public RedisMessageBus(IConnectionMultiplexer connectionMultiplexer, IClientNotifier notifier)
+    public RedisMessageBus(IConnectionMultiplexer connectionMultiplexer)
     {
         _connectionMultiplexer = connectionMultiplexer;
-        _notifier = notifier;
     }
 
     public Task PublishAsync<T>(string channel, T message, CancellationToken cancellationToken = default) where T : class
@@ -24,9 +20,7 @@ public class RedisMessageBus : IMessageBus
         //Get subscribers to recieve a message.
         ISubscriber subscriber = _connectionMultiplexer.GetSubscriber();
         
-        subscriber.PublishAsync(RedisChannel.Literal(channel), jsonString);
-        
-        return _notifier.Notify(message as IEvent, cancellationToken);
+        return subscriber.PublishAsync(RedisChannel.Literal(channel), jsonString);
        
     }
 

@@ -1,6 +1,5 @@
 using System.Net.WebSockets;
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
-using kitchenOS_Scada.Contract.Events;
 using kitchenOS_Scada.Api.Simulator;
 using kitchenOS_Scada.Api.Notifier;
 using StackExchange.Redis;
@@ -8,10 +7,6 @@ using kitchenOS_Scada.Api.Simulator.Devices;
 using kitchenOS_Scada.Api.Helpers;
 using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
-using kitchenOS_Scada.Contract.Events;
-
-
-
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -41,6 +36,12 @@ builder.Services.AddSingleton<IMessageBus>(services =>
 builder.Services.AddSingleton<WebSocketClientNotifier>();
 builder.Services.AddSingleton<IClientNotifier>(services =>
     services.GetRequiredService<WebSocketClientNotifier>());
+    
+    // Register event handlers and the message bus service
+builder.Services.AddSingleton<TelemetryEventHandler>();
+builder.Services.AddSingleton<AlarmEventHandler>();
+builder.Services.AddSingleton<CommandResultEventHandler>();
+builder.Services.AddHostedService<MessageBusService>();
 
 
 
@@ -51,13 +52,6 @@ string devicesJson = FileHelper.GetSimulationData("devices.json");
 string simulationJson = FileHelper.GetSimulationData("simulation.json");
 // Load the devices. To be replaced with a database call in the future.
 simulator.Load(devicesJson, simulationJson, app.Services.GetRequiredService<IMessageBus>());
-
-//listen for events from the message bus and send them to connected clients.
-var messageBus = app.Services.GetRequiredService<IMessageBus>();
-messageBus.Subscribe<EventEnvelope>(DeviceSimulator.EventsChannel, async (eventMessage, cancellationToken) =>
-{
-    await app.Services.GetRequiredService<IClientNotifier>().Notify(eventMessage, cancellationToken);
-});
 
 app.UseWebSockets();
 app.UseCors("Frontend");
