@@ -6,6 +6,24 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: kitchen-os-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -24,7 +42,10 @@ services:
       - "8080:8080"
 
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
 
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -32,6 +53,7 @@ services:
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
       DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
       ConnectionStrings__Redis: redis:6379
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
 
     restart: unless-stopped
 
@@ -86,3 +108,6 @@ services:
 
     command: sh -c "npm install && npm run dev -- --hostname 0.0.0.0"
     restart: unless-stopped
+
+volumes:
+  postgres-data:
