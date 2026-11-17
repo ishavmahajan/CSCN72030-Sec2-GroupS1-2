@@ -63,12 +63,6 @@ public sealed class MessageBusService(
     private void SubscribeToCommandResultEvents(CancellationToken stoppingToken)
     {
         messageBus.Subscribe<EventEnvelope>(
-            MessageChannels.Events,
-            (eventMessage, _) => eventMessage.EventName == commandResultEventHandler.EventName
-                ? HandleEventAsync(eventMessage, commandResultEventHandler, stoppingToken)
-                : Task.CompletedTask);
-
-        messageBus.Subscribe<EventEnvelope>(
             MessageChannels.CommandResultEvents,
             (eventMessage, _) => HandleEventAsync(
                 eventMessage,

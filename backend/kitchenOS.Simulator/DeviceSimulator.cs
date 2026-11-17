@@ -71,19 +71,26 @@ public class DeviceSimulator : IDeviceSimulator
 
     public async Task Start(CancellationToken cancellationToken = default)
     {
-        if (_messageBus is not null && !_commandsSubscribed)
-        {
-            _running = true;
-            Bus.Subscribe<DeviceCommand>(MessageChannels.Commands,
-                (command, _) => OnCommand(command, cancellationToken));
-            _commandsSubscribed = true;
-        }
+        SubscribeToCommands(cancellationToken);
 
         foreach  (var device in _devices)
         {
             await StartDeviceSimulation(device, cancellationToken);
         }
       
+    }
+
+    private void SubscribeToCommands(CancellationToken cancellationToken)
+    {
+        if (_messageBus is null || _commandsSubscribed)
+        {
+            return;
+        }
+
+        _running = true;
+        Bus.Subscribe<DeviceCommand>(MessageChannels.Commands,
+            (command, _) => OnCommand(command, cancellationToken));
+        _commandsSubscribed = true;
     }
 
     public Task StartDeviceSimulation(SimulatedDevice device, CancellationToken cancellationToken)
@@ -246,7 +253,7 @@ public class DeviceSimulator : IDeviceSimulator
             }
         };
 
-        return Bus.PublishAsync(MessageChannels.Events, envelope, cancellationToken);
+        return Bus.PublishAsync(MessageChannels.CommandResultEvents, envelope, cancellationToken);
     }
 
     private IMessageBus Bus => _messageBus ?? throw new InvalidOperationException("Call Load before publishing.");

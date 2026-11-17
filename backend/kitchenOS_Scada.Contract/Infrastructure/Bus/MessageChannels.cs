@@ -2,7 +2,7 @@ namespace kitchenOS_Scada.Contract.Infrastructure.Bus;
 
 public static class MessageChannels
 {
-    public const string Commands = "kitchenos";
+    public const string Commands = "kitchenos:commands";
 
     public const string Events = "kitchenos:events";
 

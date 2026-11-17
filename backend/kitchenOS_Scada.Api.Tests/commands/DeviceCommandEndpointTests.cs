@@ -95,7 +95,7 @@ public class DeviceCommandEndpointTests
         Assert.AreEqual("MIX-001", commands[0].DeviceId);
         Assert.AreEqual(TimeSpan.Zero, DateTimeOffset.Parse(commands[0].Timestamp).Offset);
         Assert.IsTrue(commands[0].Timestamp.EndsWith("Z", StringComparison.Ordinal));
-        Assert.IsTrue(_bus.Messages.All(message => message.Channel == "kitchenos"));
+        Assert.IsTrue(_bus.Messages.All(message => message.Channel == "kitchenos:commands"));
         Assert.IsFalse(_bus.Messages.Any(message => message.Message is EventEnvelope));
     }
 
@@ -196,7 +196,7 @@ public class DeviceCommandEndpointTests
     public async Task SimulatorResult_ReachesSocketWithOriginalCommandId(string deviceId, string json, string expectedStatus)
     {
         await _simulator.Start(_shutdown.Token);
-        await _bus.WaitForSubscriptionAsync("kitchenos");
+        await _bus.WaitForSubscriptionAsync("kitchenos:commands");
         foreach (SimulatedDevice device in _simulator.GetDevices())
         {
             await _bus.WaitForTelemetryAsync(device.DeviceId);
@@ -210,7 +210,7 @@ public class DeviceCommandEndpointTests
         await service.StartAsync(_shutdown.Token);
         try
         {
-            await _bus.WaitForSubscriptionAsync("kitchenos:events");
+            await _bus.WaitForSubscriptionAsync("kitchenos:events:command-results");
             HttpResponseMessage response = await PostAsync(deviceId, json);
             Assert.AreEqual(HttpStatusCode.Accepted, response.StatusCode);
             QueuedCommandResponse queued = (await response.Content.ReadFromJsonAsync<QueuedCommandResponse>())!;
@@ -218,8 +218,8 @@ public class DeviceCommandEndpointTests
             Assert.IsFalse(_bus.Messages.Any(message => message.Message is EventEnvelope envelope &&
                 envelope.EventName == "command_result"));
 
-            await _bus.DispatchAsync("kitchenos", command);
-            EventEnvelope result = _bus.Messages.Where(message => message.Channel == "kitchenos:events")
+            await _bus.DispatchAsync("kitchenos:commands", command);
+            EventEnvelope result = _bus.Messages.Where(message => message.Channel == "kitchenos:events:command-results")
                 .Select(message => (EventEnvelope)message.Message).Single();
             CommandResultBody body = (CommandResultBody)result.Message;
             Assert.AreEqual(queued.CommandId, body.CommandId);
@@ -230,7 +230,7 @@ public class DeviceCommandEndpointTests
             {
                 Assert.IsFalse(string.IsNullOrWhiteSpace(body.Reason));
             }
-            await _bus.DispatchAsync("kitchenos:events", result);
+            await _bus.DispatchAsync("kitchenos:events:command-results", result);
             using JsonDocument delivered = JsonDocument.Parse(socket.Messages.Single());
             Assert.AreEqual("command_result", delivered.RootElement.GetProperty("eventName").GetString());
             Assert.AreEqual(queued.CommandId, delivered.RootElement.GetProperty("message").GetProperty("commandId").GetString());
@@ -256,12 +256,11 @@ public class DeviceCommandEndpointTests
         await service.StartAsync(_shutdown.Token);
         try
         {
-            await _bus.WaitForSubscriptionAsync(MessageChannels.Events);
+            await _bus.WaitForSubscriptionAsync(MessageChannels.CommandResultEvents);
             EventEnvelope telemetry = new() { EventName = "telemetry", Message = new TelemetryBody() };
             EventEnvelope alarm = new() { EventName = "alarm", Message = new TelemetryBody() };
             await _bus.DispatchAsync(MessageChannels.TelemetryEvents, telemetry);
             await _bus.DispatchAsync(MessageChannels.AlarmEvents, alarm);
-            await _bus.DispatchAsync(MessageChannels.Events, telemetry);
             CollectionAssert.AreEqual(new[] { "telemetry", "alarm" }, notifier.Events.ToArray());
         }
         finally
