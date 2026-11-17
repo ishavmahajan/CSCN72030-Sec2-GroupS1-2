@@ -13,6 +13,7 @@ public class DeviceSimulator : IDeviceSimulator
     private readonly Random _random = new();
     private IMessageBus? _messageBus;
     private bool _running;
+    private bool _commandsSubscribed;
 
    
     
@@ -70,6 +71,14 @@ public class DeviceSimulator : IDeviceSimulator
 
     public async Task Start(CancellationToken cancellationToken = default)
     {
+        if (_messageBus is not null && !_commandsSubscribed)
+        {
+            _running = true;
+            Bus.Subscribe<DeviceCommand>(MessageChannels.Commands,
+                (command, _) => OnCommand(command, cancellationToken));
+            _commandsSubscribed = true;
+        }
+
         foreach  (var device in _devices)
         {
             await StartDeviceSimulation(device, cancellationToken);
@@ -122,78 +131,70 @@ public class DeviceSimulator : IDeviceSimulator
 
     private async Task OnCommand(DeviceCommand command, CancellationToken cancellationToken)
     {
-        if (!_running)
+        if (!_running || cancellationToken.IsCancellationRequested)
         {
             return;
         }
 
-        var device = _devices.FirstOrDefault(item => item.DeviceId == command.DeviceId);
-        // If the device is not found and the command has no arguments, we ignore it
-        if (device is null && command.Arguments?.Value is null)
+        SimulatedDevice? device = _devices.Find(candidate => candidate.DeviceId == command.DeviceId);
+        if (device is null)
         {
+            await PublishResult(command, null, "rejected", "Device was not found.", cancellationToken);
             return;
         }
 
-        var arguments = command.Arguments;
+        CommandArguments? arguments = command.Arguments;
+        bool accepted;
+        string? reason = null;
+
         switch (command.CommandName)
         {
             case "isOnline":
                 await PublishTelemetry(device, cancellationToken);
-                return;
+                accepted = true;
+                break;
             case "setValue":
-                var accepted = device.TrySetValue(
-                    arguments?.Name ?? "",
-                    arguments?.Value ?? default,
-                    arguments?.Component,
-                    out var setReason);
-                await PublishResult(
-                    device,
-                    command.CommandId,
-                    accepted ? "acknowledged" : "rejected",
-                    accepted ? null : setReason,
-                    cancellationToken);
-                return;
-            case "start":
-                await FinishCommand(device, command.CommandId, device.StartComponent(arguments?.Component), "component is required", cancellationToken);
-                return;
-            case "stop":
-                await FinishCommand(device, command.CommandId, device.StopComponent(arguments?.Component), "component is required", cancellationToken);
-                return;
-            case "setMode":
-                var modeAccepted = device.TrySetMode(arguments?.Mode ?? "", arguments?.Component, out var modeReason);
-                if (!modeAccepted && modeReason == "setMode is not accepted")
+                object? value = arguments?.Value.ValueKind switch
                 {
-                    return;
+                    JsonValueKind.Number when arguments.Value.TryGetDouble(out double number)
+                        && double.IsFinite(number) => number,
+                    JsonValueKind.String => arguments.Value.GetString(),
+                    JsonValueKind.True => true,
+                    JsonValueKind.False => false,
+                    _ => null
+                };
+                if (string.IsNullOrWhiteSpace(arguments?.Name) || value is null)
+                {
+                    accepted = false;
+                    reason = "setValue requires a point name and a scalar value.";
+                    break;
                 }
-
-                await PublishResult(
-                    device,
-                    command.CommandId,
-                    modeAccepted ? "acknowledged" : "rejected",
-                    modeAccepted ? null : modeReason,
-                    cancellationToken);
-                return;
+                accepted = device.TrySetValue(arguments.Name, value, arguments.Component, out reason);
+                break;
+            case "start":
+                accepted = device.StartComponent(arguments?.Component);
+                reason = accepted ? null : "The device or component cannot be started.";
+                break;
+            case "stop":
+                accepted = device.StopComponent(arguments?.Component);
+                reason = accepted ? null : "The device or component cannot be stopped.";
+                break;
+            case "setMode":
+                if (string.IsNullOrWhiteSpace(arguments?.Mode))
+                {
+                    accepted = false;
+                    reason = "setMode requires a non-empty mode.";
+                    break;
+                }
+                accepted = device.TrySetMode(arguments.Mode, arguments.Component, out reason);
+                break;
+            default:
+                accepted = false;
+                reason = "The command is not supported.";
+                break;
         }
-    }
 
-    private async Task FinishCommand(
-        SimulatedDevice device,
-        string commandId,
-        bool accepted,
-        string reason,
-        CancellationToken cancellationToken)
-    {
-        if (!accepted && reason == "component is required" && device.DeviceType != DeviceTypes.Stove)
-        {
-            return;
-        }
-
-        await PublishResult(
-            device,
-            commandId,
-            accepted ? "acknowledged" : "rejected",
-            accepted ? null : reason,
-            cancellationToken);
+        await PublishResult(command, device, accepted ? "acknowledged" : "rejected", reason, cancellationToken);
     }
 
     private Task PublishTelemetry(SimulatedDevice device, CancellationToken cancellationToken)
@@ -223,8 +224,8 @@ public class DeviceSimulator : IDeviceSimulator
 
 
     private Task PublishResult(
-        SimulatedDevice device,
-        string commandId,
+        DeviceCommand command,
+        SimulatedDevice? device,
         string status,
         string? reason,
         CancellationToken cancellationToken)
@@ -233,19 +234,19 @@ public class DeviceSimulator : IDeviceSimulator
         var envelope = new EventEnvelope
         {
             EventName = "command_result",
-            DeviceId = device.DeviceId.ToString(),
-            DeviceType = device.DeviceType,
+            DeviceId = command.DeviceId,
+            DeviceType = device?.DeviceType ?? default,
             Timestamp = timestamp,
             Message = new CommandResultBody
             {
                 Timestamp = DateTime.UtcNow,
-                CommandId = commandId,
+                CommandId = command.CommandId,
                 Status = status,
                 Reason = reason
             }
         };
 
-        return Bus.PublishAsync(MessageChannels.CommandResultEvents, envelope, cancellationToken);
+        return Bus.PublishAsync(MessageChannels.Events, envelope, cancellationToken);
     }
 
     private IMessageBus Bus => _messageBus ?? throw new InvalidOperationException("Call Load before publishing.");
@@ -257,4 +258,5 @@ public class DeviceSimulator : IDeviceSimulator
         return _devices;
     }
 }
+
 

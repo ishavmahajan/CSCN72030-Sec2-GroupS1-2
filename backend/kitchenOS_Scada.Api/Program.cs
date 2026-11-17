@@ -7,6 +7,7 @@ using kitchenOS_Scada.Api.Simulator.Devices;
 using kitchenOS_Scada.Api.Helpers;
 using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
+using kitchenOS_Scada.Api.Commands;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -127,4 +128,7 @@ app.MapGet("/devices", () =>
         readPoints = d.ReadPoints()
     }));
 }).WithName("GetDevices");
+DeviceCommandEndpoint.MapEndpoints(app, simulator);
+
 app.Run();
+
