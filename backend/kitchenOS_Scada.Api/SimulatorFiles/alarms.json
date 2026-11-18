@@ -1,0 +1,418 @@
+{
+  "WALK_IN_FREEZER": [
+    {
+      "code": "over-temperature",
+      "severity": "critical",
+      "text": "Freezer air temperature stayed above the high limit after the alarm delay"
+    },
+    {
+      "code": "under-temperature",
+      "severity": "warning",
+      "text": "Freezer air temperature stayed below the low limit after the alarm delay"
+    },
+    {
+      "code": "door-open",
+      "severity": "warning",
+      "text": "Freezer door has been open longer than the door alarm delay"
+    },
+    {
+      "code": "fault",
+      "severity": "critical",
+      "text": "Freezer compressor overload protection tripped"
+    },
+    {
+      "code": "evaporator-fan-stalled",
+      "severity": "critical",
+      "text": "Freezer evaporator fan stopped while cooling"
+    },
+    {
+      "code": "defrost-timeout",
+      "severity": "warning",
+      "text": "Freezer defrost cycle did not finish"
+    },
+    {
+      "code": "evaporator-iced",
+      "severity": "warning",
+      "text": "Ice is obstructing the freezer evaporator"
+    },
+    {
+      "code": "air-probe-fault",
+      "severity": "critical",
+      "text": "Freezer air temperature probe is disconnected or shorted"
+    },
+    {
+      "code": "drain-pan-high-level",
+      "severity": "warning",
+      "text": "Freezer drain pan high-level switch is active"
+    },
+    {
+      "code": "refrigerant-pressure-low",
+      "severity": "critical",
+      "text": "Freezer refrigeration circuit pressure is low"
+    }
+  ],
+  "STOVE": [
+    {
+      "code": "over-temperature",
+      "severity": "critical",
+      "text": "Burner high-limit protection tripped"
+    },
+    {
+      "code": "fault",
+      "severity": "warning",
+      "text": "No current detected while the burner heating element was energized"
+    },
+    {
+      "code": "contactor-feedback-fault",
+      "severity": "critical",
+      "text": "Burner contactor did not confirm closure after a start command"
+    },
+    {
+      "code": "burner-stuck-on",
+      "severity": "critical",
+      "text": "Burner remains energized after a stop command"
+    },
+    {
+      "code": "burner-sensor-fault",
+      "severity": "warning",
+      "text": "Burner temperature sensor stopped reporting"
+    },
+    {
+      "code": "power-phase-loss",
+      "severity": "critical",
+      "text": "Stove power monitor detected a missing supply phase"
+    },
+    {
+      "code": "burner-current-high",
+      "severity": "critical",
+      "text": "Burner current exceeds its rated limit"
+    },
+    {
+      "code": "control-panel-fault",
+      "severity": "warning",
+      "text": "Stove control panel is unresponsive"
+    },
+    {
+      "code": "supply-voltage-low",
+      "severity": "warning",
+      "text": "Stove supply voltage is too low"
+    },
+    {
+      "code": "cooling-fan-fault",
+      "severity": "warning",
+      "text": "Stove electronics cooling fan is commanded on but has no speed feedback"
+    }
+  ],
+  "OVEN": [
+    {
+      "code": "door-open",
+      "severity": "warning",
+      "text": "Oven door remained open past the alarm delay during a cooking cycle"
+    },
+    {
+      "code": "fault",
+      "severity": "critical",
+      "text": "Oven cavity temperature probe is disconnected or shorted"
+    },
+    {
+      "code": "preheat-timeout",
+      "severity": "warning",
+      "text": "Oven did not finish preheating within the allotted time"
+    },
+    {
+      "code": "convection-fan-stalled",
+      "severity": "warning",
+      "text": "Oven convection fan stopped during a cycle"
+    },
+    {
+      "code": "door-switch-fault",
+      "severity": "warning",
+      "text": "Oven door switch did not change state when the latch engaged"
+    },
+    {
+      "code": "heating-element-open",
+      "severity": "warning",
+      "text": "Oven heating element drew no current when commanded on"
+    },
+    {
+      "code": "heating-relay-stuck",
+      "severity": "critical",
+      "text": "Oven heating relay remained closed after a stop command"
+    },
+    {
+      "code": "timer-fault",
+      "severity": "warning",
+      "text": "Oven cycle timer stopped advancing"
+    },
+    {
+      "code": "controller-communication-loss",
+      "severity": "warning",
+      "text": "Oven display lost communication with the oven controller"
+    },
+    {
+      "code": "power-interruption",
+      "severity": "warning",
+      "text": "Oven restarted after a power interruption and the cooking cycle was aborted"
+    }
+  ],
+  "MIXER": [
+    {
+      "code": "fault",
+      "severity": "critical",
+      "text": "Mixer motor overload protection tripped"
+    },
+    {
+      "code": "bowl-unlatched",
+      "severity": "warning",
+      "text": "Mixer bowl latch opened during operation"
+    },
+    {
+      "code": "guard-open",
+      "severity": "warning",
+      "text": "Mixer guard opened during operation"
+    },
+    {
+      "code": "agitator-jammed",
+      "severity": "critical",
+      "text": "Mixer drive detected high motor current with the agitator stopped"
+    },
+    {
+      "code": "speed-feedback-lost",
+      "severity": "warning",
+      "text": "Mixer speed sensor stopped reporting"
+    },
+    {
+      "code": "speed-mismatch",
+      "severity": "warning",
+      "text": "Mixer speed differs from the commanded speed"
+    },
+    {
+      "code": "vibration-high",
+      "severity": "warning",
+      "text": "Mixer vibration exceeds its operating limit"
+    },
+    {
+      "code": "motor-thermal-trip",
+      "severity": "critical",
+      "text": "Mixer motor winding thermal switch tripped"
+    },
+    {
+      "code": "guard-interlock-fault",
+      "severity": "critical",
+      "text": "Mixer guard interlock channels disagree and the drive is inhibited"
+    },
+    {
+      "code": "stop-feedback-fault",
+      "severity": "critical",
+      "text": "Mixer drive still reports shaft motion after the stop timeout"
+    }
+  ],
+  "EXHAUST_FAN": [
+    {
+      "code": "filter",
+      "severity": "warning",
+      "text": "Pressure drop across the exhaust filter indicates it needs service"
+    },
+    {
+      "code": "fault",
+      "severity": "critical",
+      "text": "Exhaust fan motor overload protection tripped"
+    },
+    {
+      "code": "airflow-low",
+      "severity": "warning",
+      "text": "Exhaust airflow is low while the fan is running"
+    },
+    {
+      "code": "filter-missing",
+      "severity": "warning",
+      "text": "Exhaust filter is missing"
+    },
+    {
+      "code": "filter-blocked",
+      "severity": "critical",
+      "text": "Pressure drop across the exhaust filter reached the critical limit"
+    },
+    {
+      "code": "fan-speed-mismatch",
+      "severity": "warning",
+      "text": "Exhaust fan speed differs from the commanded speed"
+    },
+    {
+      "code": "vibration-high",
+      "severity": "warning",
+      "text": "Exhaust fan vibration exceeds its operating limit"
+    },
+    {
+      "code": "damper-proof-failed",
+      "severity": "critical",
+      "text": "Exhaust damper open switch did not confirm opening before fan enable"
+    },
+    {
+      "code": "airflow-sensor-fault",
+      "severity": "warning",
+      "text": "Exhaust airflow sensor stopped reporting"
+    },
+    {
+      "code": "fan-rotation-not-proven",
+      "severity": "warning",
+      "text": "Fan shaft rotation was not detected while the motor was running"
+    }
+  ],
+  "BLENDER": [
+    {
+      "code": "fault",
+      "severity": "critical",
+      "text": "Blender motor overload protection tripped"
+    },
+    {
+      "code": "lid-unlocked",
+      "severity": "warning",
+      "text": "Blender lid unlocked during operation"
+    },
+    {
+      "code": "jar-unseated",
+      "severity": "warning",
+      "text": "Blender jar is no longer seated on the base"
+    },
+    {
+      "code": "blade-jammed",
+      "severity": "critical",
+      "text": "Blender blade stopped turning while the motor was energized"
+    },
+    {
+      "code": "speed-feedback-lost",
+      "severity": "warning",
+      "text": "Blender speed sensor stopped reporting"
+    },
+    {
+      "code": "acceleration-timeout",
+      "severity": "warning",
+      "text": "Blender motor failed to reach the selected speed within the startup window"
+    },
+    {
+      "code": "motor-thermal-trip",
+      "severity": "critical",
+      "text": "Blender motor thermal protection tripped"
+    },
+    {
+      "code": "liquid-in-base",
+      "severity": "critical",
+      "text": "Blender base moisture sensor detected liquid"
+    },
+    {
+      "code": "lid-interlock-fault",
+      "severity": "critical",
+      "text": "Blender lid interlock failed its self-check and motor start is inhibited"
+    },
+    {
+      "code": "pulse-control-stuck",
+      "severity": "critical",
+      "text": "Blender pulse control remained active after release"
+    }
+  ],
+  "DISHWASHER": [
+    {
+      "code": "fault",
+      "severity": "critical",
+      "text": "Dishwasher circulation pump overload protection tripped"
+    },
+    {
+      "code": "cycle-fault",
+      "severity": "warning",
+      "text": "Dishwasher restarted after a power interruption and the cycle was aborted"
+    },
+    {
+      "code": "low-level",
+      "severity": "warning",
+      "text": "Detergent level is low"
+    },
+    {
+      "code": "fill-timeout",
+      "severity": "warning",
+      "text": "Dishwasher did not reach its fill level in time"
+    },
+    {
+      "code": "drain-timeout",
+      "severity": "warning",
+      "text": "Dishwasher water level did not fall during draining"
+    },
+    {
+      "code": "water-level-high",
+      "severity": "critical",
+      "text": "Dishwasher high-level float tripped during fill"
+    },
+    {
+      "code": "door-unlatched",
+      "severity": "warning",
+      "text": "Dishwasher door unlatched during a cycle"
+    },
+    {
+      "code": "rinse-temperature-low",
+      "severity": "warning",
+      "text": "Dishwasher rinse water did not reach the target temperature"
+    },
+    {
+      "code": "wash-pressure-low",
+      "severity": "warning",
+      "text": "Wash manifold pressure stayed low with the circulation pump running"
+    },
+    {
+      "code": "detergent-dispenser-fault",
+      "severity": "warning",
+      "text": "Detergent dosing pump did not confirm delivery during the wash cycle"
+    }
+  ],
+  "SINK": [
+    {
+      "code": "leak",
+      "severity": "critical",
+      "text": "Leak sensor beneath the sink detected water"
+    },
+    {
+      "code": "drain-timeout",
+      "severity": "warning",
+      "text": "Sink basin water level did not fall within the expected drain time"
+    },
+    {
+      "code": "basin-high-level",
+      "severity": "critical",
+      "text": "Sink basin high-level switch is active"
+    },
+    {
+      "code": "flow-while-closed",
+      "severity": "warning",
+      "text": "Flow meter registers sustained flow after the supply valve closes"
+    },
+    {
+      "code": "no-flow",
+      "severity": "warning",
+      "text": "Sink has no water flow with the supply valve open"
+    },
+    {
+      "code": "valve-stuck",
+      "severity": "warning",
+      "text": "Sink valve did not reach its commanded position"
+    },
+    {
+      "code": "flow-sensor-fault",
+      "severity": "warning",
+      "text": "Sink flow sensor stopped reporting"
+    },
+    {
+      "code": "backflow-detected",
+      "severity": "critical",
+      "text": "Sink supply flow meter detected sustained reverse flow"
+    },
+    {
+      "code": "supply-pressure-low",
+      "severity": "warning",
+      "text": "Sink water supply pressure is low"
+    },
+    {
+      "code": "temperature-sensor-fault",
+      "severity": "warning",
+      "text": "Sink water temperature sensor stopped reporting"
+    }
+  ]
+}
