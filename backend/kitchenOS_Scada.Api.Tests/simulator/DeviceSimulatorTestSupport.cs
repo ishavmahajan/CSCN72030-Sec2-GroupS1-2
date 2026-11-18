@@ -1,4 +1,7 @@
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
+using System.Collections.Concurrent;
+using System.Text.Json;
+using kitchenOS_Scada.Contract.Events;
 
 namespace kitchenOS_Scada.Api.Tests.Simulator;
 
@@ -31,20 +34,57 @@ internal static class DeviceSimulatorTestData
 
 internal sealed class RecordingMessageBus : IMessageBus
 {
-    public List<(string Channel, object Message)> Messages { get; } = [];
+    private readonly SemaphoreSlim _published = new(0);
+    private readonly ConcurrentQueue<(string Channel, object Message)> _messages = new();
+    private readonly ConcurrentDictionary<string, Func<object, Task>> _handlers = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _subscriptions = new();
 
-    public Task PublishAsync<T>(
+    public IReadOnlyList<(string Channel, object Message)> Messages => _messages.ToArray();
+    public Exception? PublishFailure { get; set; }
+    public Task? PublishCompletion { get; set; }
+
+    public async Task PublishAsync<T>(
         string channel,
         T message,
         CancellationToken cancellationToken = default)
         where T : class
     {
-        Messages.Add((channel, message));
-        return Task.CompletedTask;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (PublishFailure is not null)
+        {
+            throw PublishFailure;
+        }
+        if (PublishCompletion is not null)
+        {
+            await PublishCompletion.WaitAsync(cancellationToken);
+        }
+        _messages.Enqueue((channel, message));
+        _published.Release();
     }
 
     public void Subscribe<T>(string channel, Func<T, CancellationToken, Task> handler)
         where T : class
     {
+        _handlers[channel] = message => handler(
+            JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(message))!,
+            CancellationToken.None);
+        _subscriptions.GetOrAdd(channel, _ => new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously)).TrySetResult();
     }
+
+    public Task WaitForSubscriptionAsync(string channel) =>
+        _subscriptions.GetOrAdd(channel, _ => new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously)).Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+    public async Task WaitForTelemetryAsync(string deviceId)
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(5));
+        while (!_messages.Any(message => message.Message is EventEnvelope envelope &&
+            envelope.EventName == "telemetry" && envelope.DeviceId == deviceId))
+        {
+            await _published.WaitAsync(timeout.Token);
+        }
+    }
+
+    public Task DispatchAsync(string channel, object message) => _handlers[channel](message);
 }

@@ -12,3 +12,4 @@ public static class MessageChannels
 
     public const string CommandResultEvents = "kitchenos:events:command-results";
 }
+
