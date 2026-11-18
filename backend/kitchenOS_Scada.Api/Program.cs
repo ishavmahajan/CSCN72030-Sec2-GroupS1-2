@@ -3,16 +3,18 @@ using kitchenOS_Scada.Contract.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Simulator;
 using kitchenOS_Scada.Api.Notifier;
 using StackExchange.Redis;
-using kitchenOS_Scada.Api.Simulator.Devices;
 using kitchenOS_Scada.Api.Helpers;
 using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
-using kitchenOS_Scada.Api.Commands;
+using kitchenOS_Scada.Api.Features.Devices;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddControllers();
+builder.Services.AddSingleton<DeviceSimulator>();
+builder.Services.AddSingleton<IDeviceCommandService, DeviceCommandService>();
 
 builder.Services.AddCors(options =>
 {
@@ -48,7 +50,7 @@ builder.Services.AddHostedService<MessageBusService>();
 
 var app = builder.Build();
 
-var simulator = new DeviceSimulator();
+var simulator = app.Services.GetRequiredService<DeviceSimulator>();
 string devicesJson = FileHelper.GetSimulationData("devices.json");
 string simulationJson = FileHelper.GetSimulationData("simulation.json");
 // Load the devices. To be replaced with a database call in the future.
@@ -63,6 +65,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
 }
+
+app.MapControllers();
 
 app.MapGet("/health", () =>
 {
@@ -116,19 +120,5 @@ app.Map("/ws", async (HttpContext context, WebSocketClientNotifier notifier) =>
         notifier.RemoveClient(clientId);
     }
 }).WithName("WebSocketEndpoint");
-app.MapGet("/devices", () =>
-{
-    List<SimulatedDevice> devices = simulator.GetDevices();
-    return Results.Ok(devices.Select(d => new
-    {
-        d.DeviceId,
-        d.DeviceType,
-        d.DeviceName,
-        d.Description,
-        readPoints = d.ReadPoints()
-    }));
-}).WithName("GetDevices");
-DeviceCommandEndpoint.MapEndpoints(app, simulator);
-
 app.Run();
 

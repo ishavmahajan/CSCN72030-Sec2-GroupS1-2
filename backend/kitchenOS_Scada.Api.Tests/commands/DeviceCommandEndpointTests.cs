@@ -4,7 +4,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using kitchenOS.Simulator;
-using kitchenOS_Scada.Api.Commands;
+using kitchenOS_Scada.Api.Features.Devices;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Notifier;
 using kitchenOS_Scada.Api.Simulator.Devices;
@@ -53,8 +53,12 @@ public class DeviceCommandEndpointTests
         WebApplicationBuilder builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddSingleton<IMessageBus>(_bus);
+        builder.Services.AddSingleton(_simulator);
+        builder.Services.AddSingleton<IDeviceCommandService, DeviceCommandService>();
+        builder.Services.AddControllers()
+            .AddApplicationPart(typeof(DevicesController).Assembly);
         _app = builder.Build();
-        DeviceCommandEndpoint.MapEndpoints(_app, _simulator);
+        _app.MapControllers();
         await _app.StartAsync();
         _client = new HttpClient { BaseAddress = new Uri(_app.Urls.Single()) };
     }
@@ -83,7 +87,7 @@ public class DeviceCommandEndpointTests
 
         Assert.AreEqual(HttpStatusCode.Accepted, first.StatusCode);
         Assert.AreEqual(HttpStatusCode.Accepted, second.StatusCode);
-        QueuedCommandResponse queued = (await first.Content.ReadFromJsonAsync<QueuedCommandResponse>())!;
+        QueuedDeviceCommandResponse queued = (await first.Content.ReadFromJsonAsync<QueuedDeviceCommandResponse>())!;
         DeviceCommand[] commands = _bus.Messages.Select(message => message.Message).OfType<DeviceCommand>().ToArray();
         Assert.AreEqual(2, commands.Length);
         Assert.AreEqual("queued", queued.Status);
@@ -175,13 +179,11 @@ public class DeviceCommandEndpointTests
     {
         TaskCompletionSource published = new(TaskCreationOptions.RunContinuationsAsynchronously);
         _bus.PublishCompletion = published.Task;
-        Task<IResult> pending = DeviceCommandEndpoint.SendAsync("MIX-001",
-            new CommandRequest { CommandName = "start" }, _simulator, _bus,
-            NullLogger<DeviceCommandEndpoint>.Instance);
+        Task<HttpResponseMessage> pending = PostAsync("MIX-001", """{"commandName":"start"}""");
         Assert.IsFalse(pending.IsCompleted);
         published.SetResult();
-        IResult result = await pending;
-        Assert.AreEqual(202, ((Microsoft.AspNetCore.Http.IStatusCodeHttpResult)result).StatusCode);
+        HttpResponseMessage result = await pending;
+        Assert.AreEqual(HttpStatusCode.Accepted, result.StatusCode);
     }
 
     [DataTestMethod]
@@ -213,7 +215,7 @@ public class DeviceCommandEndpointTests
             await _bus.WaitForSubscriptionAsync("kitchenos:events:command-results");
             HttpResponseMessage response = await PostAsync(deviceId, json);
             Assert.AreEqual(HttpStatusCode.Accepted, response.StatusCode);
-            QueuedCommandResponse queued = (await response.Content.ReadFromJsonAsync<QueuedCommandResponse>())!;
+            QueuedDeviceCommandResponse queued = (await response.Content.ReadFromJsonAsync<QueuedDeviceCommandResponse>())!;
             DeviceCommand command = _bus.Messages.Select(message => message.Message).OfType<DeviceCommand>().Single();
             Assert.IsFalse(_bus.Messages.Any(message => message.Message is EventEnvelope envelope &&
                 envelope.EventName == "command_result"));

@@ -24,6 +24,12 @@ public sealed class DevicesController(
         return Ok(devices);
     }
 
+    /// <summary>Rejects command requests that do not specify a device ID.</summary>
+    [HttpPost("commands")]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult SendCommandWithoutDeviceId() =>
+        BadRequest(new { error = "Device ID is required." });
+
     /// <summary>Queues a command for a simulated device.</summary>
     [HttpPost("{deviceId}/commands")]
     [ProducesResponseType<QueuedDeviceCommandResponse>(StatusCodes.Status202Accepted)]
