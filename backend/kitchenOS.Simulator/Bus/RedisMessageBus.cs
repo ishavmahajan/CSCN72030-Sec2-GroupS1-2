@@ -21,8 +21,7 @@ public class RedisMessageBus : IMessageBus
         //Get subscribers to recieve a message.
         ISubscriber subscriber = _connectionMultiplexer.GetSubscriber();
         
-        subscriber.PublishAsync(RedisChannel.Literal(channel), jsonString);
-        return Task.CompletedTask;
+        return subscriber.PublishAsync(RedisChannel.Literal(channel), jsonString);
     }
 
     public void Subscribe<T>(string channel, Func< T, CancellationToken, Task> handler) where T : class
@@ -48,3 +47,4 @@ public class RedisMessageBus : IMessageBus
         });
     }
 }
+
