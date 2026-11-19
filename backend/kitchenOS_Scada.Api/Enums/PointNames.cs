@@ -1,5 +1,6 @@
 namespace kitchenOS_Scada.Api.Enums;
 
+// Point identifiers exposed by the supported simulated devices.
 public enum PointNames
 {
     Temperature,
@@ -29,6 +30,7 @@ public enum PointNames
 
 public static class PointNamesExtensions
 {
+    // Map enum names to the camel-case point names used in device payloads.
     public static string GetPointName(this PointNames pointName)
     {
         return pointName switch

@@ -3,6 +3,7 @@ using kitchenOS_Scada.Contract.Enums;
 
 namespace kitchenOS_Scada.Api.Simulator.Devices;
 
+// Simulates dishwasher cycle, temperature, water, detergent, and energy points.
 public class Dishwasher : SimulatedDevice
 {
     public double Temperature { get; set; }
@@ -20,6 +21,7 @@ public class Dishwasher : SimulatedDevice
 
     public static Dishwasher FromJson(JsonElement json)
     {
+        // Initialize the dishwasher from the configured simulation choices.
         var dishwasher = new Dishwasher();
         Random random = new Random();
         dishwasher.Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), dishwasher.Temperature, false);
@@ -48,6 +50,7 @@ public class Dishwasher : SimulatedDevice
 
     public override bool StartComponent(string? component)
     {
+        // Starting the dishwasher transitions its cycle to running.
         Cycle = "running";
         return true;
     }

@@ -5,6 +5,7 @@ using kitchenOS_Scada.Contract.Events;
 
 namespace kitchenOS_Scada.Api.Tests.Simulator;
 
+// Deterministic simulator data shared by tests that exercise device behavior.
 internal static class DeviceSimulatorTestData
 {
     public const string SimulationJson = """
@@ -49,6 +50,7 @@ internal sealed class RecordingMessageBus : IMessageBus
         CancellationToken cancellationToken = default)
         where T : class
     {
+        // Capture published messages while preserving cancellation and failure behavior.
         cancellationToken.ThrowIfCancellationRequested();
         if (PublishFailure is not null)
         {
@@ -65,6 +67,7 @@ internal sealed class RecordingMessageBus : IMessageBus
     public void Subscribe<T>(string channel, Func<T, CancellationToken, Task> handler)
         where T : class
     {
+        // Serialize through JSON to mirror the contract crossing the real bus.
         _handlers[channel] = message => handler(
             JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(message))!,
             CancellationToken.None);

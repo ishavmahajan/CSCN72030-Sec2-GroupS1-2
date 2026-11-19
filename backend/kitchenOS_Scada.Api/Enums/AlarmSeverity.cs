@@ -1,5 +1,6 @@
 namespace kitchenOS_Scada.Api.Enums;
 
+// Severity levels used when presenting device alarms.
 public enum AlarmSeverity
 {
     INFO,
@@ -10,6 +11,7 @@ public enum AlarmSeverity
 
 public static class AlarmSeverityExtensions
 {
+    // Convert severity values to their lowercase wire representation.
     public static string GetAlarmSeverity(this AlarmSeverity alarmSeverity)
     {
         return alarmSeverity switch

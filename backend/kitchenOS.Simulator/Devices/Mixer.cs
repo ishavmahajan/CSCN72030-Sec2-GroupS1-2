@@ -3,6 +3,7 @@ using kitchenOS_Scada.Contract.Enums;
 
 namespace kitchenOS_Scada.Api.Simulator.Devices;
 
+// Simulates a mixer while preserving command-set speed values during updates.
 public class Mixer : SimulatedDevice
 {
     public string Motor { get; set; } = "off";
@@ -46,6 +47,7 @@ public class Mixer : SimulatedDevice
 
     public override void UpdateProperties(Random random)
     {
+        // A commanded speed remains fixed until the device is recreated.
         Speed = DeviceJson.Pick(random, speedChoices, Speed, speedSetByCommand);
     }
 

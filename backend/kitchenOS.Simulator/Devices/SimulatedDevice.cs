@@ -3,6 +3,7 @@ using kitchenOS_Scada.Contract.Enums;
 
 namespace kitchenOS_Scada.Api.Simulator.Devices;
 
+// Defines the operations required by every simulated kitchen device.
 public interface ISimulatedDevice
 {
     string DeviceId { get; }
@@ -22,6 +23,7 @@ public interface ISimulatedDevice
 
 
 }
+// Provides shared identity, configuration, readings, and command behavior.
 public abstract class SimulatedDevice : ISimulatedDevice
 {
     protected JsonElement _json;
@@ -87,6 +89,7 @@ public abstract class SimulatedDevice : ISimulatedDevice
 
     public static SimulatedDevice Create(string deviceType, JsonElement json)
     {
+        // Keep device construction in one place so JSON loading uses the same mapping.
         if (deviceType == "WALK_IN_FREEZER") return WalkInFreezer.FromJson(json);
         if (deviceType == "STOVE") return Stove.FromJson(json);
         if (deviceType == "OVEN") return Oven.FromJson(json);
@@ -114,6 +117,7 @@ public abstract class SimulatedDevice : ISimulatedDevice
 
 }
 
+// Snapshot of one device point suitable for API and telemetry projection.
 public class PointReading
 {
     public PointReading(string name, object value, string? unit, string? component)

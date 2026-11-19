@@ -1,5 +1,6 @@
 namespace kitchenOS_Scada.Contract.Infrastructure.Bus;
 
+// Canonical Redis channel names shared by publishers and subscribers.
 public static class MessageChannels
 {
     public const string Commands = "kitchenos:commands";

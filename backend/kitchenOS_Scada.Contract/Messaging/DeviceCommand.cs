@@ -2,6 +2,7 @@ using System.Text.Json;
 
 namespace kitchenOS_Scada.Contract.Messaging;
 
+// Message sent to a device-specific command channel.
 public class DeviceCommand
 {
     public string CommandId { get; set; } = "";

@@ -1,4 +1,6 @@
 namespace kitchenOS_Scada.Api.Enums;
+
+// Event types recognized by the API's event pipeline.
 public enum EventNames
 {
     TELEMETRY,
@@ -10,6 +12,7 @@ public enum EventNames
 
 public static class EventNamesExtensions
 {
+    // Convert event enum values to their client-facing names.
     public static string GetEventName(this EventNames eventName)
     {
         return eventName switch

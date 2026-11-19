@@ -1,11 +1,13 @@
 namespace kitchenOS_Scada.Api.Helpers;
 
+// Loads simulator files from the application's working directory.
 class FileHelper
 {
     public static string GetFilePath(string fileName)
     {
         var currentDirectory = Directory.GetCurrentDirectory();
         var filePath = Path.Combine(currentDirectory, "SimulatorFiles", fileName);
+        // Log the resolved path to make missing deployment content easy to diagnose.
         Console.WriteLine($"Looking for file '{fileName}' at path: {filePath}");
         
         return filePath;

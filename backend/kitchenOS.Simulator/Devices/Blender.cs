@@ -3,6 +3,7 @@ using kitchenOS_Scada.Contract.Enums;
 
 namespace kitchenOS_Scada.Api.Simulator.Devices;
 
+// Simulates blender motor, speed, power, and energy telemetry.
 public class Blender : SimulatedDevice
 {
     public string Motor { get; set; } = "off";
@@ -44,6 +45,7 @@ public class Blender : SimulatedDevice
 
     public override void UpdateProperties(Random random)
     {
+        // Do not overwrite a speed explicitly set through a command.
         Speed = DeviceJson.Pick(random, speedChoices, Speed, speedSetByCommand);
     }
 

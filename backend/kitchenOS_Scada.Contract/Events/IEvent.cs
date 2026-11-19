@@ -3,6 +3,7 @@ using kitchenOS_Scada.Contract.Messaging;
 
 namespace kitchenOS_Scada.Contract.Events;
 
+// Common metadata contract for events delivered to API clients.
 public interface IEvent
 {
     string EventName { get; }

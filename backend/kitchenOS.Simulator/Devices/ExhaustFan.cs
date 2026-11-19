@@ -3,6 +3,7 @@ using kitchenOS_Scada.Contract.Enums;
 
 namespace kitchenOS_Scada.Api.Simulator.Devices;
 
+// Simulates exhaust airflow, filter state, power state, and energy readings.
 public class ExhaustFan : SimulatedDevice
 {
     public double FanSpeed { get; set; }
@@ -57,6 +58,7 @@ public class ExhaustFan : SimulatedDevice
 
     public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
+        // Only writable fan points are accepted by the command path.
         if (name == "fanSpeed" && value is double fanSpeed)
         {
             FanSpeed = fanSpeed;

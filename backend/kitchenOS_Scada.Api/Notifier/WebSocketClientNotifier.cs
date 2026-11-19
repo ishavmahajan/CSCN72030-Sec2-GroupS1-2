@@ -6,6 +6,7 @@ using kitchenOS_Scada.Contract.Events;
 
 namespace kitchenOS_Scada.Api.Notifier;
 
+// Maintains active WebSocket connections and serializes event fan-out safely.
 public class WebSocketClientNotifier : IClientNotifier
 {
     private readonly ConcurrentDictionary<Guid, ClientConnection> clients = new();
@@ -26,6 +27,7 @@ public class WebSocketClientNotifier : IClientNotifier
 
     public Guid AddClient(WebSocket socket)
     {
+        // The generated ID lets cleanup remove a connection without comparing sockets.
         Guid clientId = Guid.NewGuid();
         clients.TryAdd(clientId, new ClientConnection(socket));
         return clientId;
@@ -40,6 +42,7 @@ public class WebSocketClientNotifier : IClientNotifier
         IEvent deviceEvent,
         CancellationToken cancellationToken = default)
     {
+        // A per-client semaphore prevents concurrent WebSocket sends from interleaving.
         cancellationToken.ThrowIfCancellationRequested();
 
         if (clients.IsEmpty)

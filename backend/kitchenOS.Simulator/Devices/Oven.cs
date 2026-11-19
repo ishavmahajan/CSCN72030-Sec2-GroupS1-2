@@ -3,6 +3,7 @@ using kitchenOS_Scada.Contract.Enums;
 
 namespace kitchenOS_Scada.Api.Simulator.Devices;
 
+// Simulates oven temperature, timing, power, door, and operating mode points.
 public class Oven : SimulatedDevice
 {
     public double Temperature { get; set; }
@@ -20,6 +21,7 @@ public class Oven : SimulatedDevice
 
     public static Oven FromJson(JsonElement json)
     {
+        // Select an initial value from each configured simulation range.
         var oven = new Oven();
         Random random = new Random();
         oven.Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), oven.Temperature, false);
@@ -62,6 +64,7 @@ public class Oven : SimulatedDevice
 
     public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)
     {
+        // Oven points are scalar values and do not use a component identifier.
 
         if (name == "temperature" && value is double temperature)
         {

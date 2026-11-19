@@ -3,6 +3,7 @@ using kitchenOS_Scada.Contract.Messaging;
 
 namespace kitchenOS_Scada.Contract.Events;
 
+// Wraps a device event with routing metadata and its typed message body.
 public class EventEnvelope : IEvent
 {
     public string EventName { get; set; } = "";

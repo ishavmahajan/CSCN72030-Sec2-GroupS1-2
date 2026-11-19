@@ -3,6 +3,8 @@ using kitchenOS_Scada.Contract.Messaging;
 using kitchenOS_Scada.Api.Enums;
 
 namespace kitchenOS_Scada.Api.Messaging;
+
+// Represents the telemetry payload exchanged by device integrations.
 public class TelemetryMessage: IMessage
 {
     public string DeviceId { get; set; }

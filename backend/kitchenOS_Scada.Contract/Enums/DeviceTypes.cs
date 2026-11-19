@@ -1,5 +1,6 @@
 namespace kitchenOS_Scada.Contract.Enums;
 
+// Device types supported by the simulator and message contracts.
 public enum DeviceTypes
 {
     WalkInFreezer,
@@ -14,6 +15,7 @@ public enum DeviceTypes
 
 public static class DeviceTypeExtensions
 {
+    // Convert enum values to the uppercase identifiers used by simulation JSON.
     public static string ToFriendlyString(this DeviceTypes deviceType)
     {
         return deviceType switch

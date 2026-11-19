@@ -7,6 +7,7 @@ using kitchenOS_Scada.Contract.Messaging;
 
 namespace kitchenOS_Scada.Api.Features.Devices;
 
+// Validates device commands, creates bus messages, and publishes them asynchronously.
 public interface IDeviceCommandService
 {
     Task<DeviceCommandSubmissionResult> SubmitAsync(
@@ -30,6 +31,7 @@ public sealed class DeviceCommandService(
         SendDeviceCommandRequest request,
         CancellationToken cancellationToken)
     {
+        // Reject unsupported commands before looking up a device or publishing anything.
         if (string.IsNullOrWhiteSpace(request.CommandName) ||
             request.CommandName is not ("start" or "stop" or "setValue" or "setMode" or "isOnline"))
         {
@@ -60,6 +62,7 @@ public sealed class DeviceCommandService(
                 : DeviceDtoMappings.CloneArguments(request.Arguments)
         };
 
+        // Publish only after all request, device, and argument validation succeeds.
         await messageBus.PublishAsync(
             MessageChannels.Commands,
             command,
@@ -72,6 +75,7 @@ public sealed class DeviceCommandService(
         SimulatedDevice device,
         SendDeviceCommandRequest request)
     {
+        // Online checks do not require point-specific arguments.
         CommandArguments? arguments = request.Arguments;
         if (request.CommandName == "isOnline")
         {

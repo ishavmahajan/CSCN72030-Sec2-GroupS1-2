@@ -2,6 +2,7 @@ using System.Text.Json;
 
 namespace kitchenOS_Scada.Api.Simulator.Devices;
 
+// Safely reads optional scalar values and choice lists from simulator JSON.
 public static class DeviceJson
 {
 
@@ -118,6 +119,7 @@ public static class DeviceJson
     }
     public static double Pick(Random random, List<double> choices, double current, bool lockedByCommand)
     {
+        // Empty or command-locked ranges keep the current device value.
         if (lockedByCommand || choices.Count == 0)
         {
             return current;

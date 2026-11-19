@@ -1,5 +1,6 @@
 namespace kitchenOS_Scada.Api.Enums;
 
+// Outcomes reported after a device command is processed.
 public enum CommandStatuses
 {
    ACKNOWLEDGED,
@@ -8,6 +9,7 @@ public enum CommandStatuses
 
 public static class CommandStatusesExtensions
 {
+    // Keep API strings stable while allowing internal code to use an enum.
     public static string GetCommandStatus(this CommandStatuses commandStatus)
     {
         return commandStatus switch

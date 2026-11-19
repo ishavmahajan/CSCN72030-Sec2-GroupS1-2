@@ -21,6 +21,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace kitchenOS_Scada.Api.Tests.Commands;
 
+// Exercises command validation, publication, and WebSocket result delivery.
 [TestClass]
 public class DeviceCommandEndpointTests
 {
@@ -33,6 +34,7 @@ public class DeviceCommandEndpointTests
     [TestInitialize]
     public async Task Initialize()
     {
+        // Use an in-memory bus so endpoint tests verify behavior without Redis.
         _simulator.Load(
             """
             [
@@ -66,6 +68,7 @@ public class DeviceCommandEndpointTests
     [TestCleanup]
     public async Task Cleanup()
     {
+        // Stop background simulation work before disposing the test host.
         _shutdown.Cancel();
         _simulator.Stop();
         _client?.Dispose();
