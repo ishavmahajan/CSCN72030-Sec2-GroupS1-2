@@ -17,11 +17,16 @@ internal sealed class SimulatorWorker(
             AppContext.BaseDirectory,
             "SimulatorFiles",
             "simulation.json");
+        string alarmsPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "SimulatorFiles",
+            "alarm.json");
 
         string devicesJson = await File.ReadAllTextAsync(devicesPath, stoppingToken);
         string simulationJson = await File.ReadAllTextAsync(simulationPath, stoppingToken);
+        string alarmsJson = await File.ReadAllTextAsync(alarmsPath, stoppingToken);
 
-        simulator.Load(devicesJson, simulationJson, messageBus);
+        simulator.Load(devicesJson, simulationJson, alarmsJson, messageBus);
         await simulator.Start(stoppingToken);
 
         try

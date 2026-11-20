@@ -5,7 +5,8 @@ namespace kitchenOS.Simulator;
 
 public interface IDeviceSimulator
 {
-    void Load(string devicesString, string simulationString,  IMessageBus messageBus);
+    void Load(string devicesString, string simulationString, string alarmsString, IMessageBus messageBus);
+    IReadOnlyList<DeviceAlarm> GetAlarms(string deviceId);
     // void UpdateProperties();
     // Task PublishEvents(CancellationToken cancellationToken = default);
      Task Start(CancellationToken cancellationToken = default);

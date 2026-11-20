@@ -31,6 +31,19 @@ internal static class DeviceSimulatorTestData
           }
         }
         """;
+
+    public const string AlarmJson = """
+        {
+          "MIXER": [
+            { "code": "fault", "severity": "critical", "text": "Mixer motor overload protection tripped" }
+          ],
+          "SINK": [
+            { "code": "leak", "severity": "critical", "text": "Leak sensor beneath the sink detected water" }
+          ],
+          "BLENDER": [],
+          "OVEN": []
+        }
+        """;
 }
 
 internal sealed class RecordingMessageBus : IMessageBus

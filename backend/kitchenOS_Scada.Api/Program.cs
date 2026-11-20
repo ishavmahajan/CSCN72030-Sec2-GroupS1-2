@@ -62,7 +62,9 @@ var app = builder.Build();
 var simulator = app.Services.GetRequiredService<DeviceSimulator>();
 string devicesJson = FileHelper.GetSimulationData("devices.json");
 string simulationJson = FileHelper.GetSimulationData("simulation.json");
-simulator.Load(devicesJson, simulationJson, app.Services.GetRequiredService<IMessageBus>());
+string alarmsPath = Path.Combine(AppContext.BaseDirectory, "SimulatorFiles", "alarm.json");
+string alarmsJson = File.ReadAllText(alarmsPath);
+simulator.Load(devicesJson, simulationJson, alarmsJson, app.Services.GetRequiredService<IMessageBus>());
 
 // Configure middleware before mapping HTTP and WebSocket endpoints.
 app.UseWebSockets();

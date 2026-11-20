@@ -23,6 +23,7 @@ public class DeviceSimulatorLoadTests
             ]
             """,
             DeviceSimulatorTestData.SimulationJson,
+            DeviceSimulatorTestData.AlarmJson,
             new RecordingMessageBus());
 
         var devices = simulator.GetDevices();
@@ -43,11 +44,13 @@ public class DeviceSimulatorLoadTests
         simulator.Load(
             """[{ "deviceName": "Mixer-1", "deviceType": "MIXER" }]""",
             DeviceSimulatorTestData.SimulationJson,
+            DeviceSimulatorTestData.AlarmJson,
             messageBus);
 
         simulator.Load(
             """[{ "deviceName": "Blender-1", "deviceType": "BLENDER" }]""",
             DeviceSimulatorTestData.SimulationJson,
+            DeviceSimulatorTestData.AlarmJson,
             messageBus);
 
         var devices = simulator.GetDevices();
@@ -55,5 +58,30 @@ public class DeviceSimulatorLoadTests
         var device = devices.Single();
         Assert.IsInstanceOfType(device, typeof(Blender));
         Assert.AreEqual("Blender-1", device.DeviceName);
+    }
+
+    [TestMethod]
+    public void GetAlarms_ReturnsDefinitionsForTheRequestedDeviceType()
+    {
+        var simulator = new DeviceSimulator();
+
+        simulator.Load(
+            """
+            [
+              { "deviceId": "MIX-001", "deviceName": "Mixer-1", "deviceType": "MIXER" },
+              { "deviceId": "SNK-001", "deviceName": "Sink-1", "deviceType": "SINK" }
+            ]
+            """,
+            DeviceSimulatorTestData.SimulationJson,
+            DeviceSimulatorTestData.AlarmJson,
+            new RecordingMessageBus());
+
+        IReadOnlyList<DeviceAlarm> mixerAlarms = simulator.GetAlarms("MIX-001");
+        IReadOnlyList<DeviceAlarm> sinkAlarms = simulator.GetAlarms("SNK-001");
+
+        Assert.AreEqual("fault", mixerAlarms.Single().Code);
+        Assert.AreEqual("Mixer motor overload protection tripped", mixerAlarms.Single().Text);
+        Assert.AreEqual("leak", sinkAlarms.Single().Code);
+        Assert.ThrowsExactly<KeyNotFoundException>(() => simulator.GetAlarms("MISSING"));
     }
 }
