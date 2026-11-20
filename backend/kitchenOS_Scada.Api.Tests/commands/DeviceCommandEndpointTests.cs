@@ -50,7 +50,6 @@ public class DeviceCommandEndpointTests
               "OVEN":{"door":["closed"],"mode":["bake"]}
             }
             """,
-            DeviceSimulatorTestData.AlarmJson,
             _bus);
 
         WebApplicationBuilder builder = WebApplication.CreateBuilder();

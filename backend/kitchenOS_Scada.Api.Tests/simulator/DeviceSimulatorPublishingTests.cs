@@ -25,8 +25,8 @@ public class DeviceSimulatorPublishingTests
             ]
             """,
             DeviceSimulatorTestData.SimulationJson,
-            DeviceSimulatorTestData.AlarmJson,
             messageBus);
+        simulator.LoadAlarms(DeviceSimulatorTestData.AlarmJson);
 
         await simulator.PublishEvents();
 
@@ -35,7 +35,7 @@ public class DeviceSimulatorPublishingTests
             .ToArray();
         Assert.AreEqual(2, telemetryMessages.Length);
         Assert.IsTrue(messageBus.Messages.All(message =>
-            message.Channel is MessageChannels.TelemetryEvents or MessageChannels.AlarmEvents));
+            message.Channel == MessageChannels.TelemetryEvents));
         foreach (var message in telemetryMessages)
         {
             var envelope = message.Message as EventEnvelope;
@@ -47,33 +47,41 @@ public class DeviceSimulatorPublishingTests
     }
 
     [TestMethod]
-    public async Task PublishEvents_WhenRandomAlarmIsSelected_PublishesApplicableAlarm()
+    public async Task PublishAlarms_PublishesExactlyOneApplicableRandomAlarm()
     {
-        // Ensure the first random draw takes the 10% alarm-generation branch.
-        int seed = Enumerable.Range(0, 1000)
-            .First(candidate => new Random(candidate).NextDouble() < 0.1);
-        var simulator = new DeviceSimulator(new Random(seed));
+        var simulator = new DeviceSimulator(new Random(1234));
         var messageBus = new RecordingMessageBus();
 
         simulator.Load(
-            """[{ "deviceId": "MIX-001", "deviceName": "Mixer-1", "deviceType": "MIXER" }]""",
+            """
+            [
+              { "deviceId": "MIX-001", "deviceName": "Mixer-1", "deviceType": "MIXER" },
+              { "deviceId": "SNK-001", "deviceName": "Sink-1", "deviceType": "SINK" }
+            ]
+            """,
             DeviceSimulatorTestData.SimulationJson,
-            DeviceSimulatorTestData.AlarmJson,
             messageBus);
+        simulator.LoadAlarms(DeviceSimulatorTestData.AlarmJson);
 
-        await simulator.PublishEvents();
+        await simulator.PublishAlarms();
 
-        var alarmMessage = messageBus.Messages.Single(message =>
-            message.Channel == MessageChannels.AlarmEvents);
+        var alarmMessages = messageBus.Messages
+            .Where(message => message.Channel == MessageChannels.AlarmEvents)
+            .ToArray();
+        Assert.AreEqual(1, alarmMessages.Length);
+
+        var alarmMessage = alarmMessages[0];
         var envelope = alarmMessage.Message as EventEnvelope;
         Assert.IsNotNull(envelope);
         Assert.AreEqual("alarm", envelope.EventName);
-        Assert.AreEqual("MIX-001", envelope.DeviceId);
+        Assert.IsTrue(envelope.DeviceId is "MIX-001" or "SNK-001");
         Assert.IsInstanceOfType(envelope.Message, typeof(AlarmBody));
 
         var body = (AlarmBody)envelope.Message;
-        Assert.AreEqual("fault", body.Code);
-        Assert.AreEqual("critical", body.Severity);
-        Assert.AreEqual("Mixer motor overload protection tripped", body.Text);
+        var applicableAlarms = simulator.GetAlarms(envelope.DeviceId);
+        Assert.IsTrue(applicableAlarms.Any(alarm =>
+            alarm.Code == body.Code &&
+            alarm.Severity == body.Severity &&
+            alarm.Text == body.Text));
     }
 }

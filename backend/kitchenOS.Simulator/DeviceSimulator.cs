@@ -9,7 +9,6 @@ namespace kitchenOS.Simulator;
 
 public class DeviceSimulator : IDeviceSimulator
 {
-    private const double AlarmGenerationProbability = 0.1;
     private readonly List<SimulatedDevice> _devices = [];
     private Dictionary<string, DeviceAlarm[]> _alarms = new(StringComparer.OrdinalIgnoreCase);
     private readonly Random _random;
@@ -23,7 +22,7 @@ public class DeviceSimulator : IDeviceSimulator
         _random = random ?? new Random();
     }
 
-    public void Load(string devicesString, string simulationString, string alarmsString, IMessageBus messageBus)
+    public void Load(string devicesString, string simulationString, IMessageBus messageBus)
     {
         _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
         _devices.Clear();
@@ -31,13 +30,8 @@ public class DeviceSimulator : IDeviceSimulator
         using var parsedDevices = JsonDocument.Parse(devicesString);
         JsonElement parsedDevicesRoot = parsedDevices.RootElement;
 
-        using var parsedSimulation = JsonDocument.Parse(simulationString);
+        var parsedSimulation = JsonDocument.Parse(simulationString);
         JsonElement parsedSimulationRoot = parsedSimulation.RootElement;
-        var parsedAlarms = JsonSerializer.Deserialize<Dictionary<string, DeviceAlarm[]>>(
-            alarmsString,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-            ?? throw new JsonException("Alarm configuration must be a JSON object.");
-        _alarms = new Dictionary<string, DeviceAlarm[]>(parsedAlarms, StringComparer.OrdinalIgnoreCase);
 
         foreach (JsonElement item in parsedDevicesRoot.EnumerateArray())
         {
@@ -59,6 +53,15 @@ public class DeviceSimulator : IDeviceSimulator
             // device.Description = item.GetProperty("description").GetString() ?? "No description available";
             _devices.Add(device);
         }
+    }
+
+    public void LoadAlarms(string alarmsString)
+    {
+        var parsedAlarms = JsonSerializer.Deserialize<Dictionary<string, DeviceAlarm[]>>(
+            alarmsString,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new JsonException("Alarm configuration must be a JSON object.");
+        _alarms = new Dictionary<string, DeviceAlarm[]>(parsedAlarms, StringComparer.OrdinalIgnoreCase);
     }
 
     // Returns the configured alarm definitions for a loaded device.
@@ -91,8 +94,36 @@ public class DeviceSimulator : IDeviceSimulator
     {
         foreach (var device in _devices)
         {
-            await PublishDeviceEvents(device, cancellationToken);
+            await PublishTelemetry(device, cancellationToken);
         }
+    }
+
+    public async Task PublishAlarms(CancellationToken cancellationToken = default)
+    {
+        if (_devices.Count == 0)
+        {
+            throw new InvalidOperationException("Load devices before publishing alarms.");
+        }
+
+        SimulatedDevice selectedDevice;
+        DeviceAlarm selectedAlarm;
+        lock (_random)
+        {
+            var candidates = _devices
+                .Select(device => (Device: device, Alarms: GetAlarms(device.DeviceId)))
+                .Where(candidate => candidate.Alarms.Count > 0)
+                .ToArray();
+            if (candidates.Length == 0)
+            {
+                throw new InvalidOperationException("No configured alarms are available for the loaded devices.");
+            }
+
+            var selected = candidates[_random.Next(candidates.Length)];
+            selectedDevice = selected.Device;
+            selectedAlarm = selected.Alarms[_random.Next(selected.Alarms.Count)];
+        }
+
+        await PublishAlarm(selectedDevice, selectedAlarm, cancellationToken);
     }
 
     public async Task Start(CancellationToken cancellationToken = default)
@@ -139,7 +170,7 @@ public class DeviceSimulator : IDeviceSimulator
                     Console.WriteLine($"Updating device properties and publishing telemetry for {device.DeviceName} every {device.RefreshRate} ms...");
 
                     device.refreshFromJson();
-                    await PublishDeviceEvents(device, cancellationToken);
+                    await PublishTelemetry(device, cancellationToken);
 
                     await Task.Delay(device.RefreshRate, cancellationToken);
                 }
@@ -155,12 +186,6 @@ public class DeviceSimulator : IDeviceSimulator
         }, cancellationToken);
 
         return Task.CompletedTask;
-    }
-
-    private async Task PublishDeviceEvents(SimulatedDevice device, CancellationToken cancellationToken)
-    {
-        await PublishTelemetry(device, cancellationToken);
-        await PublishAlarm(device, cancellationToken);
     }
 
     public void Stop()
@@ -236,26 +261,11 @@ public class DeviceSimulator : IDeviceSimulator
         await PublishResult(command, device, accepted ? "acknowledged" : "rejected", reason, cancellationToken);
     }
 
-    private async Task PublishAlarm(SimulatedDevice device, CancellationToken cancellationToken)
+    private Task PublishAlarm(
+        SimulatedDevice device,
+        DeviceAlarm selectedAlarm,
+        CancellationToken cancellationToken)
     {
-        IReadOnlyList<DeviceAlarm> alarms = GetAlarms(device.DeviceId);
-        if (alarms.Count == 0)
-        {
-            return;
-        }
-
-        DeviceAlarm selectedAlarm;
-        // Device loops run concurrently, so keep the chance check and selection atomic.
-        lock (_random)
-        {
-            if (_random.NextDouble() >= AlarmGenerationProbability)
-            {
-                return;
-            }
-
-            selectedAlarm = alarms[_random.Next(alarms.Count)];
-        }
-
         DateTime timestamp = DateTime.UtcNow;
         var envelope = new EventEnvelope
         {
@@ -272,7 +282,7 @@ public class DeviceSimulator : IDeviceSimulator
             }
         };
 
-        await Bus.PublishAsync(MessageChannels.AlarmEvents, envelope, cancellationToken);
+        return Bus.PublishAsync(MessageChannels.AlarmEvents, envelope, cancellationToken);
     }
 
     private Task PublishTelemetry(SimulatedDevice device, CancellationToken cancellationToken)

@@ -24,7 +24,20 @@ type Device = {
 
 type DevicePoint = { name: string; value: unknown; unit?: string | null; component?: string | null }
 type ApiDevice = { deviceId: string; deviceName: string; deviceType: string; description: string; readPoints: DevicePoint[] }
-type DeviceEvent = { deviceId: string; message?: { values?: DevicePoint[] } }
+type AlarmEvent = { id: string; deviceId: string; deviceType: string; code: string; severity: string; text: string; timestamp: string }
+type DeviceEvent = {
+  eventName: string
+  deviceId: string
+  deviceType: string
+  timestamp: string
+  message?: {
+    values?: DevicePoint[]
+    code?: string
+    severity?: string
+    text?: string
+    timestamp?: string
+  }
+}
 
 const deviceMetadata: Record<string, { icon: LucideIcon; color: string; type: string }> = {
   WALK_IN_FREEZER: { icon: Snowflake, color: 'blue', type: 'Cold storage' },
@@ -119,7 +132,7 @@ export default function Page() {
   const [modes, setModes] = useState<Record<string, string>>({})
   const [connected, setConnected] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [alarmVisible, setAlarmVisible] = useState(true)
+  const [alarms, setAlarms] = useState<AlarmEvent[]>([])
 
   useEffect(() => {
     let disposed = false
@@ -148,6 +161,29 @@ export default function Page() {
     socket.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as DeviceEvent
+        if (message.eventName === 'alarm') {
+          const alarm = message.message
+          const code = alarm?.code
+          const severity = alarm?.severity
+          const text = alarm?.text
+          if (!message.deviceId || !message.deviceType || !code || !severity || !text) {
+            console.error('Ignoring malformed alarm event', message)
+            return
+          }
+
+          const timestamp = alarm.timestamp ?? message.timestamp
+          setAlarms((current) => [{
+            id: `${message.deviceId}-${code}-${timestamp}-${Math.random().toString(36).slice(2)}`,
+            deviceId: message.deviceId,
+            deviceType: message.deviceType,
+            code,
+            severity,
+            text,
+            timestamp,
+          }, ...current].slice(0, 5))
+          return
+        }
+
         const values = message.message?.values
         if (!message.deviceId || !values) return
         setDevices((current) => current.map((device) => device.id === message.deviceId ? updateDevice(device, values) : device))
@@ -170,5 +206,93 @@ export default function Page() {
 
   if (!selected) return <main className="app-shell"><section className="main-area"><div className="page-content"><p>Loading kitchen devices…</p></div></section></main>
 
-  return <main className="app-shell"><aside className={`sidebar ${menuOpen ? 'open' : ''}`}><div className="brand"><img src="/kitchenos-logo.svg" alt="KitchenOS" /><button className="close-menu" onClick={() => setMenuOpen(false)}><X size={20} /></button></div><nav>{[{ label: 'Overview', icon: LayoutGrid }, { label: 'Equipment', icon: ClipboardList }, { label: 'Alarms', icon: Bell, badge: '2' }, { label: 'Trends', icon: Activity }, { label: 'Events', icon: ClipboardList }, { label: 'Settings', icon: Settings }].map(({ label, icon: Icon, badge }) => <a className={label === 'Overview' ? 'active' : ''} href={`#${label.toLowerCase()}`} key={label}><Icon size={21} /><span>{label}</span>{badge && <em>{badge}</em>}</a>)}</nav><div className="sidebar-foot"><span className="version-dot" /> KitchenOS v1.0</div></aside>{menuOpen && <button className="scrim" onClick={() => setMenuOpen(false)} aria-label="Close menu" />}<section className="main-area"><header className="topbar"><button className="mobile-menu" onClick={() => setMenuOpen(true)}><Menu size={22} /></button><div className="top-brand"><img src="/kitchenos-logo.svg" alt="KitchenOS" /></div><div className="system-normal"><i /> {connected ? 'System Normal' : 'Connecting…'}</div><div className="top-meta"><span><CalendarDays size={20} /> Nov 26, 2026</span><span><Clock3 size={20} /> Live</span><span className="operator"><Power size={19} /> Operator <ChevronDown size={17} /></span></div></header><div className="page-content"><section className="kpi-row"><div className="kpi"><span className="kpi-icon"><Layers3 /></span><div><b>{online} / {devices.length}</b><small>Equipment Online</small></div><Sparkline /></div><div className="kpi"><span className="kpi-icon"><Fan /></span><div><b>{connected ? 'Live' : 'Offline'}</b><small>Socket status</small></div><Sparkline /></div><div className="kpi"><span className="kpi-icon"><Zap /></span><div><b>{devices.length}</b><small>Connected devices</small></div><Sparkline /></div><div className="kpi"><span className="kpi-icon"><Activity /></span><div><b>{selected.type}</b><small>Selected device</small></div><Sparkline /></div></section><div className="dashboard-grid"><section id="equipment" className="equipment-section"><div className="section-title"><div><h1><LayoutGrid size={22} /> Equipment Overview</h1><p>Live devices from the SCADA simulator</p></div><button>{connected ? 'Connected' : 'Connecting…'} <span>•</span></button></div><div className="devices-grid">{devices.map((device) => <DeviceCard key={device.id} device={device} selected={device.id === selectedId} active={active[device.id]} onSelect={() => setSelectedId(device.id)} />)}</div></section><DetailPanel device={selected} active={active[selected.id]} setpoint={setpoints[selected.id] ?? selected.setpoint} mode={modes[selected.id] ?? selected.mode} onToggle={() => toggle(selected.id)} onModeChange={(mode) => changeMode(selected.id, mode)} onEditSetpoint={() => {}} /></div><div className="bottom-grid"><section id="alarms" className="info-panel"><div className="panel-title"><h2><AlertTriangle size={20} /> Active Alarms <span>0</span></h2><button>View All →</button></div>{alarmVisible ? <div className="alarm-row"><AlertTriangle className="danger" size={22} /><b>System</b><span>Waiting for live alarm events</span><time>Now</time><button onClick={() => setAlarmVisible(false)} className="ack">Dismiss</button></div> : <div className="cleared"><Power size={18} /> Alarms acknowledged</div>}</section><section className="info-panel events"><div className="panel-title"><h2><ClipboardList size={20} /> Recent Events</h2><button>Live →</button></div><div className="event-row"><i /> <span>{connected ? 'Receiving device telemetry' : 'Waiting for socket connection'}</span><time>Now</time></div></section></div><footer><span><span className="online-dot" /> KitchenOS v1.0</span><span>Last updated just now · <strong>{connected ? 'Connected' : 'Disconnected'}</strong></span></footer></div></section></main>
+  return (
+    <main className="app-shell">
+      <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
+        <div className="brand">
+          <img src="/kitchenos-logo.svg" alt="KitchenOS" />
+          <button className="close-menu" onClick={() => setMenuOpen(false)}><X size={20} /></button>
+        </div>
+        <nav>
+          {[
+            { label: 'Overview', icon: LayoutGrid },
+            { label: 'Equipment', icon: ClipboardList },
+            { label: 'Alarms', icon: Bell, badge: alarms.length ? String(alarms.length) : undefined },
+            { label: 'Trends', icon: Activity },
+            { label: 'Events', icon: ClipboardList },
+            { label: 'Settings', icon: Settings },
+          ].map(({ label, icon: Icon, badge }) => (
+            <a className={label === 'Overview' ? 'active' : ''} href={`#${label.toLowerCase()}`} key={label}>
+              <Icon size={21} />
+              <span>{label}</span>
+              {badge && <em>{badge}</em>}
+            </a>
+          ))}
+        </nav>
+        <div className="sidebar-foot"><span className="version-dot" /> KitchenOS v1.0</div>
+      </aside>
+      {menuOpen && <button className="scrim" onClick={() => setMenuOpen(false)} aria-label="Close menu" />}
+      <section className="main-area">
+        <header className="topbar">
+          <button className="mobile-menu" onClick={() => setMenuOpen(true)}><Menu size={22} /></button>
+          <div className="top-brand"><img src="/kitchenos-logo.svg" alt="KitchenOS" /></div>
+          <div className="system-normal"><i /> {connected ? 'System Normal' : 'Connecting…'}</div>
+          <div className="top-meta">
+            <span><CalendarDays size={20} /> Nov 26, 2026</span>
+            <span><Clock3 size={20} /> Live</span>
+            <span className="operator"><Power size={19} /> Operator <ChevronDown size={17} /></span>
+          </div>
+        </header>
+        <div className="page-content">
+          <section className="kpi-row">
+            <div className="kpi"><span className="kpi-icon"><Layers3 /></span><div><b>{online} / {devices.length}</b><small>Equipment Online</small></div><Sparkline /></div>
+            <div className="kpi"><span className="kpi-icon"><Fan /></span><div><b>{connected ? 'Live' : 'Offline'}</b><small>Socket status</small></div><Sparkline /></div>
+            <div className="kpi"><span className="kpi-icon"><Zap /></span><div><b>{devices.length}</b><small>Connected devices</small></div><Sparkline /></div>
+            <div className="kpi"><span className="kpi-icon"><Activity /></span><div><b>{selected.type}</b><small>Selected device</small></div><Sparkline /></div>
+          </section>
+          <div className="dashboard-grid">
+            <section id="equipment" className="equipment-section">
+              <div className="section-title">
+                <div><h1><LayoutGrid size={22} /> Equipment Overview</h1><p>Live devices from the SCADA simulator</p></div>
+                <button>{connected ? 'Connected' : 'Connecting…'} <span>•</span></button>
+              </div>
+              <div className="devices-grid">
+                {devices.map((device) => (
+                  <DeviceCard key={device.id} device={device} selected={device.id === selectedId} active={active[device.id]} onSelect={() => setSelectedId(device.id)} />
+                ))}
+              </div>
+            </section>
+            <DetailPanel device={selected} active={active[selected.id]} setpoint={setpoints[selected.id] ?? selected.setpoint} mode={modes[selected.id] ?? selected.mode} onToggle={() => toggle(selected.id)} onModeChange={(mode) => changeMode(selected.id, mode)} onEditSetpoint={() => {}} />
+          </div>
+          <div className="bottom-grid">
+            <section id="alarms" className="info-panel">
+              <div className="panel-title">
+                <h2><AlertTriangle size={20} /> Active Alarms <span>{alarms.length}</span></h2>
+                <button>View All →</button>
+              </div>
+              {alarms.length === 0 ? (
+                <div className="alarm-row"><AlertTriangle className="danger" size={22} /><b>System</b><span>Waiting for live alarm events</span><time>Now</time></div>
+              ) : alarms.map((alarm) => (
+                <div className="alarm-row" key={alarm.id}>
+                  <AlertTriangle className="danger" size={22} />
+                  <b>{alarm.deviceType}</b>
+                  <span>{alarm.text} ({alarm.code}) · {alarm.severity}</span>
+                  <time dateTime={alarm.timestamp}>{new Date(alarm.timestamp).toLocaleTimeString()}</time>
+                  <button onClick={() => setAlarms((current) => current.filter((item) => item.id !== alarm.id))} className="ack">Dismiss</button>
+                </div>
+              ))}
+            </section>
+            <section className="info-panel events">
+              <div className="panel-title"><h2><ClipboardList size={20} /> Recent Events</h2><button>Live →</button></div>
+              <div className="event-row"><i /> <span>{connected ? 'Receiving device telemetry' : 'Waiting for socket connection'}</span><time>Now</time></div>
+            </section>
+          </div>
+          <footer>
+            <span><span className="online-dot" /> KitchenOS v1.0</span>
+            <span>Last updated just now · <strong>{connected ? 'Connected' : 'Disconnected'}</strong></span>
+          </footer>
+        </div>
+      </section>
+    </main>
+  )
 }

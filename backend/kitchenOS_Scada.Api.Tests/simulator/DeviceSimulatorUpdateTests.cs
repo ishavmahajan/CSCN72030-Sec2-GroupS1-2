@@ -18,7 +18,6 @@ public class DeviceSimulatorUpdateTests
         simulator.Load(
             """[{ "deviceName": "Mixer-1", "deviceType": "MIXER" }]""",
             DeviceSimulatorTestData.SimulationJson,
-            DeviceSimulatorTestData.AlarmJson,
             new RecordingMessageBus());
 
         var devices = simulator.GetDevices();
