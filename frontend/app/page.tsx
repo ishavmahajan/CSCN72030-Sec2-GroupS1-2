@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, AlertTriangle, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Clock3, Fan, Gauge, Layers3, LayoutGrid, Menu, Power, Settings, Snowflake, Square, Utensils, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
+import { Activity, AlertTriangle, Bell, CalendarDays, ChevronDown, ChevronRight, ClipboardList, Clock3, Fan, Gauge, Layers3, LayoutGrid, Menu, Power, Settings, Snowflake, Square, Utensils, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
 import { DeviceCommandControls, type DevicePoint } from '../components/device-command-controls'
 import { CommandToasts } from '../components/command-toasts'
 import { capabilityProvider, type CommandRequest, type DeviceProfile } from '../lib/device-capabilities'
@@ -28,7 +28,20 @@ type Device = {
 }
 
 type ApiDevice = { deviceId: string; deviceName: string; deviceType: string; description: string; readPoints: DevicePoint[] }
-type DeviceEvent = { eventName?: string; deviceId: string; message?: Partial<CommandResult> & { values?: DevicePoint[] } }
+type AlarmEvent = { id: string; deviceId: string; deviceType: string; code: string; severity: string; text: string; timestamp: string }
+type DeviceEvent = {
+  eventName: string
+  deviceId: string
+  deviceType: string
+  timestamp: string
+  message?: Partial<CommandResult> & {
+    values?: DevicePoint[]
+    code?: string
+    severity?: string
+    text?: string
+    timestamp?: string
+  }
+}
 
 const deviceMetadata: Record<string, { icon: LucideIcon; color: string; type: string }> = {
   WALK_IN_FREEZER: { icon: Snowflake, color: 'blue', type: 'Cold storage' },
@@ -229,6 +242,7 @@ export default function Page() {
   const { pendingDevices, toasts, dismissToast, receiveResult, submit } = useDeviceCommands(apiUrl, applyAcknowledgement)
   const [connected, setConnected] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [alarms, setAlarms] = useState<AlarmEvent[]>([])
 
   useEffect(() => {
     let disposed = false
@@ -265,6 +279,29 @@ export default function Page() {
     socket.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as DeviceEvent
+        if (message.eventName === 'alarm') {
+          const alarm = message.message
+          const code = alarm?.code
+          const severity = alarm?.severity
+          const text = alarm?.text
+          if (!message.deviceId || !message.deviceType || !code || !severity || !text) {
+            console.error('Ignoring malformed alarm event', message)
+            return
+          }
+
+          const timestamp = alarm.timestamp ?? message.timestamp
+          setAlarms((current) => [{
+            id: `${message.deviceId}-${code}-${timestamp}-${Math.random().toString(36).slice(2)}`,
+            deviceId: message.deviceId,
+            deviceType: message.deviceType,
+            code,
+            severity,
+            text,
+            timestamp,
+          }, ...current].slice(0, 5))
+          return
+        }
+
         const body = message.message
         if (message.eventName === 'command_result' && body?.commandId && body.status) {
           receiveResult(message.deviceId, { commandId: body.commandId, status: body.status, reason: body.reason })
@@ -317,11 +354,10 @@ export default function Page() {
       </header>
       <div className="page-content">
         {!connected && <section className="connection-banner" role="status"><WifiOff size={20} /><div><strong>Live connection unavailable</strong><span>Equipment values may be stale. Controls are disabled until the connection returns.</span></div></section>}
-        <section className={`alarm-summary ${connected ? '' : 'unavailable'}`} id="alarms">{connected ? <CheckCircle2 size={22} /> : <WifiOff size={22} />}<div><strong>{connected ? 'No active alarms' : 'Alarm status unavailable'}</strong><span>{connected ? 'All monitored equipment is within normal operating limits.' : 'Reconnect to resume alarm monitoring.'}</span></div><span className="alarm-count">{connected ? '0' : '—'}</span></section>
         <section className="kpi-row">
           <div className="kpi"><span className="kpi-icon"><Layers3 /></span><div><b>{online} / {devices.length}</b><small>Equipment online</small><em>{connected ? 'Updated just now' : 'Telemetry unavailable'}</em></div></div>
           <div className="kpi"><span className="kpi-icon"><Fan /></span><div><b>{devices.filter(isRunning).length}</b><small>Equipment running</small><em>Current operating state</em></div></div>
-          <div className="kpi"><span className="kpi-icon"><AlertTriangle /></span><div><b>0</b><small>Active alarms</small><em>No unacknowledged alarms</em></div></div>
+          <div className="kpi"><span className="kpi-icon"><AlertTriangle /></span><div><b>{alarms.length}</b><small>Recent alarms</small><em>Latest received alarm events</em></div></div>
           <div className="kpi"><span className="kpi-icon"><Activity /></span><div><b>{selected.type}</b><small>Selected equipment</small><em>Updated just now</em></div></div>
         </section>
         <div className="dashboard-grid">
@@ -333,6 +369,23 @@ export default function Page() {
               : <p className="command-feedback" role="status">{capabilityStatus === 'loading' ? 'Loading equipment controls…' : 'Equipment controls could not be loaded.'}</p>}
           </DetailPanel>
         </div>
+        <section id="alarms" className="info-panel">
+          <div className="panel-title">
+            <h2><AlertTriangle size={20} /> Active Alarms <span>{alarms.length}</span></h2>
+            <button>View All →</button>
+          </div>
+          {alarms.length === 0 ? (
+            <div className="alarm-row"><AlertTriangle className="danger" size={22} /><b>System</b><span>Waiting for live alarm events</span><time>Now</time></div>
+          ) : alarms.map((alarm) => (
+            <div className="alarm-row" key={alarm.id}>
+              <AlertTriangle className="danger" size={22} />
+              <b>{devices.find((device) => device.id === alarm.deviceId)?.name || alarm.deviceId}</b>
+              <span>{alarm.text} ({alarm.code}) · {alarm.severity}</span>
+              <time dateTime={alarm.timestamp}>{new Date(alarm.timestamp).toLocaleTimeString()}</time>
+              <button onClick={() => setAlarms((current) => current.filter((item) => item.id !== alarm.id))} className="ack">Dismiss</button>
+            </div>
+          ))}
+        </section>
         <section className="info-panel events"><div className="panel-title"><h2><ClipboardList size={20} /> Recent Events</h2><button>View history →</button></div><div className="event-row"><i /> <span>{connected ? 'Receiving live equipment telemetry' : 'Connection lost — displaying last known values'}</span><time>Now</time></div></section>
         <footer><span><span className="online-dot" /> KitchenOS v1.0</span><span>Last updated just now · <strong>{connected ? 'Connected' : 'Disconnected'}</strong></span></footer>
       </div>

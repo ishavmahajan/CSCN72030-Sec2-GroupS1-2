@@ -46,8 +46,8 @@ The executable uses the .NET Generic Host:
 2. Redis and the message bus are registered with dependency injection.
 3. `SimulatorWorker` is registered with `AddHostedService`.
 4. The host starts the worker and manages its cancellation lifecycle.
-5. The worker loads `SimulatorFiles/devices.json` and `simulation.json`.
-6. `DeviceSimulator` starts one simulation loop per configured device and publishes telemetry to Redis.
+5. The worker loads `SimulatorFiles/devices.json`, `simulation.json`, and `alarm.json`.
+6. `DeviceSimulator` starts one simulation loop per configured device and publishes telemetry to Redis. The worker publishes exactly one randomly selected, device-applicable alarm every 20 seconds.
 
 The simulator has no HTTP routes and publishes no ports. Its only external dependency is Redis.
 

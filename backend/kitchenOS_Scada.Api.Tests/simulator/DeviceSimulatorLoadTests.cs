@@ -56,4 +56,29 @@ public class DeviceSimulatorLoadTests
         Assert.IsInstanceOfType(device, typeof(Blender));
         Assert.AreEqual("Blender-1", device.DeviceName);
     }
+
+    [TestMethod]
+    public void GetAlarms_ReturnsDefinitionsForTheRequestedDeviceType()
+    {
+        var simulator = new DeviceSimulator();
+
+        simulator.Load(
+            """
+            [
+              { "deviceId": "MIX-001", "deviceName": "Mixer-1", "deviceType": "MIXER" },
+              { "deviceId": "SNK-001", "deviceName": "Sink-1", "deviceType": "SINK" }
+            ]
+            """,
+            DeviceSimulatorTestData.SimulationJson,
+            new RecordingMessageBus());
+        simulator.LoadAlarms(DeviceSimulatorTestData.AlarmJson);
+
+        IReadOnlyList<DeviceAlarm> mixerAlarms = simulator.GetAlarms("MIX-001");
+        IReadOnlyList<DeviceAlarm> sinkAlarms = simulator.GetAlarms("SNK-001");
+
+        Assert.AreEqual("fault", mixerAlarms.Single().Code);
+        Assert.AreEqual("Mixer motor overload protection tripped", mixerAlarms.Single().Text);
+        Assert.AreEqual("leak", sinkAlarms.Single().Code);
+        Assert.ThrowsExactly<KeyNotFoundException>(() => simulator.GetAlarms("MISSING"));
+    }
 }

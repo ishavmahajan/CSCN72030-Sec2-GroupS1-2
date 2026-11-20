@@ -7,6 +7,7 @@ namespace kitchenOS_Scada.Contract.Messaging;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")]
 [JsonDerivedType(typeof(TelemetryBody), "telemetry")]
 [JsonDerivedType(typeof(CommandResultBody), "command_result")]
+[JsonDerivedType(typeof(AlarmBody), "alarm")]
 public interface IMessage
 {
     DateTime Timestamp { get; set; }

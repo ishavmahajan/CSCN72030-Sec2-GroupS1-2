@@ -34,3 +34,12 @@ public class CommandResultBody : IMessage
     public string Status { get; set; } = "";
     public string? Reason { get; set; }
 }
+
+// Payload sent when a simulator raises one of its configured alarms.
+public class AlarmBody : IMessage
+{
+    public DateTime Timestamp { get; set; }
+    public string Code { get; set; } = "";
+    public string Severity { get; set; } = "";
+    public string Text { get; set; } = "";
+}

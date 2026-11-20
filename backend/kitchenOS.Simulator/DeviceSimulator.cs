@@ -10,13 +10,17 @@ namespace kitchenOS.Simulator;
 public class DeviceSimulator : IDeviceSimulator
 {
     private readonly List<SimulatedDevice> _devices = [];
-    private readonly Random _random = new();
+    private Dictionary<string, DeviceAlarm[]> _alarms = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Random _random;
     private IMessageBus? _messageBus;
     private bool _running;
     private bool _commandsSubscribed;
 
-   
-    
+    // An optional random source keeps alarm generation deterministic in tests.
+    public DeviceSimulator(Random? random = null)
+    {
+        _random = random ?? new Random();
+    }
 
     public void Load(string devicesString, string simulationString, IMessageBus messageBus)
     {
@@ -51,6 +55,33 @@ public class DeviceSimulator : IDeviceSimulator
         }
     }
 
+    public void LoadAlarms(string alarmsString)
+    {
+        var parsedAlarms = JsonSerializer.Deserialize<Dictionary<string, DeviceAlarm[]>>(
+            alarmsString,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new JsonException("Alarm configuration must be a JSON object.");
+        _alarms = new Dictionary<string, DeviceAlarm[]>(parsedAlarms, StringComparer.OrdinalIgnoreCase);
+    }
+
+    // Returns the configured alarm definitions for a loaded device.
+    public IReadOnlyList<DeviceAlarm> GetAlarms(string deviceId)
+    {
+        SimulatedDevice? device = _devices.Find(candidate => candidate.DeviceId == deviceId);
+        if (device is null)
+        {
+            throw new KeyNotFoundException($"Device '{deviceId}' was not found.");
+        }
+
+        string deviceType = device.DeviceType.ToFriendlyString();
+        if (!_alarms.TryGetValue(deviceType, out DeviceAlarm[]? alarms))
+        {
+            throw new KeyNotFoundException($"No alarm configuration was found for device type '{deviceType}'.");
+        }
+
+        return Array.AsReadOnly(alarms);
+    }
+
     public void UpdateProperties()
     {
         // foreach (var device in _devices)
@@ -59,14 +90,40 @@ public class DeviceSimulator : IDeviceSimulator
         // }
     }
 
-
-
     public async Task PublishEvents(CancellationToken cancellationToken = default)
     {
         foreach (var device in _devices)
         {
             await PublishTelemetry(device, cancellationToken);
         }
+    }
+
+    public async Task PublishAlarms(CancellationToken cancellationToken = default)
+    {
+        if (_devices.Count == 0)
+        {
+            throw new InvalidOperationException("Load devices before publishing alarms.");
+        }
+
+        SimulatedDevice selectedDevice;
+        DeviceAlarm selectedAlarm;
+        lock (_random)
+        {
+            var candidates = _devices
+                .Select(device => (Device: device, Alarms: GetAlarms(device.DeviceId)))
+                .Where(candidate => candidate.Alarms.Count > 0)
+                .ToArray();
+            if (candidates.Length == 0)
+            {
+                throw new InvalidOperationException("No configured alarms are available for the loaded devices.");
+            }
+
+            var selected = candidates[_random.Next(candidates.Length)];
+            selectedDevice = selected.Device;
+            selectedAlarm = selected.Alarms[_random.Next(selected.Alarms.Count)];
+        }
+
+        await PublishAlarm(selectedDevice, selectedAlarm, cancellationToken);
     }
 
     public async Task Start(CancellationToken cancellationToken = default)
@@ -130,7 +187,7 @@ public class DeviceSimulator : IDeviceSimulator
 
         return Task.CompletedTask;
     }
-    
+
     public void Stop()
     {
         _running = false;
@@ -204,6 +261,30 @@ public class DeviceSimulator : IDeviceSimulator
 
 
         await PublishResult(command, device, accepted ? "acknowledged" : "rejected", reason, cancellationToken);
+    }
+
+    private Task PublishAlarm(
+        SimulatedDevice device,
+        DeviceAlarm selectedAlarm,
+        CancellationToken cancellationToken)
+    {
+        DateTime timestamp = DateTime.UtcNow;
+        var envelope = new EventEnvelope
+        {
+            EventName = "alarm",
+            DeviceId = device.DeviceId,
+            DeviceType = device.DeviceType,
+            Timestamp = timestamp.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            Message = new AlarmBody
+            {
+                Timestamp = timestamp,
+                Code = selectedAlarm.Code,
+                Severity = selectedAlarm.Severity,
+                Text = selectedAlarm.Text
+            }
+        };
+
+        return Bus.PublishAsync(MessageChannels.AlarmEvents, envelope, cancellationToken);
     }
 
     private Task PublishTelemetry(SimulatedDevice device, CancellationToken cancellationToken)

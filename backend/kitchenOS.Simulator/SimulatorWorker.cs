@@ -17,16 +17,23 @@ internal sealed class SimulatorWorker(
             AppContext.BaseDirectory,
             "SimulatorFiles",
             "simulation.json");
+        string alarmsPath = Path.Combine(AppContext.BaseDirectory, "SimulatorFiles", "alarm.json");
 
         string devicesJson = await File.ReadAllTextAsync(devicesPath, stoppingToken);
         string simulationJson = await File.ReadAllTextAsync(simulationPath, stoppingToken);
+        string alarmsJson = await File.ReadAllTextAsync(alarmsPath, stoppingToken);
 
         simulator.Load(devicesJson, simulationJson, messageBus);
+        simulator.LoadAlarms(alarmsJson);
         await simulator.Start(stoppingToken);
 
         try
         {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            using var alarmTimer = new PeriodicTimer(TimeSpan.FromSeconds(20));
+            while (await alarmTimer.WaitForNextTickAsync(stoppingToken))
+            {
+                await simulator.PublishAlarms(stoppingToken);
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

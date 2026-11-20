@@ -7,6 +7,15 @@ class FileHelper
     {
         var currentDirectory = Directory.GetCurrentDirectory();
         var filePath = Path.Combine(currentDirectory, "SimulatorFiles", fileName);
+        if (!File.Exists(filePath))
+        {
+            string outputPath = Path.Combine(AppContext.BaseDirectory, "SimulatorFiles", fileName);
+            if (File.Exists(outputPath))
+            {
+                filePath = outputPath;
+            }
+        }
+
         // Log the resolved path to make missing deployment content easy to diagnose.
         Console.WriteLine($"Looking for file '{fileName}' at path: {filePath}");
         
