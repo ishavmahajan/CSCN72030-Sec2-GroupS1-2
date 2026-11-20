@@ -95,4 +95,11 @@ public class Mixer : SimulatedDevice
         return true;
     }
 
+    public override bool TrySetMode(string mode, string? component, out string? reason)
+    {
+        Mode = mode;
+        reason = null;
+        return true;
+    }
+
 }

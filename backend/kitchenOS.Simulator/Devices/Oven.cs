@@ -93,16 +93,6 @@ public class Oven : SimulatedDevice
             reason = null;
             return true;
         }
-        if (name == "mode" && value is string mode)
-        {
-            Mode = mode;
-            reason = null;
-            return true;
-        }
-
-        
-        
-
         reason = "unknown property";
         return false;
     }

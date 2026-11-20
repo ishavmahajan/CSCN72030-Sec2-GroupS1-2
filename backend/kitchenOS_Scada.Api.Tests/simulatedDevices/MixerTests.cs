@@ -38,4 +38,16 @@ public class MixerTests
         // Preserve the simulator's current trailing-space state value.
         Assert.AreEqual("off ", mixer.Motor);
     }
+
+    [TestMethod]
+    public void TrySetMode_UpdatesTheMode()
+    {
+        var mixer = new Mixer();
+
+        var accepted = mixer.TrySetMode("high", null, out var reason);
+
+        Assert.IsTrue(accepted);
+        Assert.IsNull(reason);
+        Assert.AreEqual("high", mixer.Mode);
+    }
 }
