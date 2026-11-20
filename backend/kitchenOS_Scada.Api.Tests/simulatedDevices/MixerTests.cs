@@ -35,8 +35,7 @@ public class MixerTests
         Assert.AreEqual("on", mixer.Motor);
 
         mixer.StopComponent(null);
-        // Preserve the simulator's current trailing-space state value.
-        Assert.AreEqual("off ", mixer.Motor);
+        Assert.AreEqual("off", mixer.Motor);
     }
 
     [TestMethod]
