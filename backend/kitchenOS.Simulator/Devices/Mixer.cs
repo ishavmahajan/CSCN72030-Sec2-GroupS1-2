@@ -91,7 +91,14 @@ public class Mixer : SimulatedDevice
 
     public override bool StopComponent(string? component)
     {
-        Motor = "off ";
+        Motor = "off";
+        return true;
+    }
+
+    public override bool TrySetMode(string mode, string? component, out string? reason)
+    {
+        Mode = mode;
+        reason = null;
         return true;
     }
 

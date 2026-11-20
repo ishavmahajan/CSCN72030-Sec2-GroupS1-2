@@ -12,6 +12,7 @@ public class WalkInFreezer : SimulatedDevice
     public double Power { get; set; }
     public double Energy { get; set; }
     public string Mode { get; set; } = "";
+    public bool IsRunning { get; private set; } = true;
 
     public override int RefreshRate { get; } = 101000;
 
@@ -29,6 +30,7 @@ public class WalkInFreezer : SimulatedDevice
         Random random = new Random();
         device.Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), device.Temperature, false);
         device.Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), device.Setpoint, false);
+        device.Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"), device.Mode, false);
         device.Compressor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "compressor"));
         device.Door = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "door"));
         // device.doorChoices.AddRange(DeviceJson.ReadTextList(json, "door"));
@@ -42,7 +44,8 @@ public class WalkInFreezer : SimulatedDevice
         Random random = new Random();
         JsonElement json = _json;
         Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), Temperature, false);
-        Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
+        // Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
+        // Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"), Mode, false);
         Compressor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "compressor"));
         Door = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "door"));
         Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
@@ -60,11 +63,27 @@ public class WalkInFreezer : SimulatedDevice
         {
             new PointReading("temperature", Temperature, "C", null),
             new PointReading("setpoint", Setpoint, "C", null),
+            new PointReading("mode", Mode, null, null),
             new PointReading("compressor", Compressor, null, null),
             new PointReading("door", Door, null, null),
             new PointReading("power", Power, "W", null),
-            new PointReading("energy", Energy, "kWh", null)
+            new PointReading("energy", Energy, "kWh", null),
+            new PointReading("isRunning", IsRunning, null, null)
         };
+    }
+
+    public override bool StartComponent(string? component)
+    {
+        if (!string.IsNullOrEmpty(component)) return false;
+        IsRunning = true;
+        return true;
+    }
+
+    public override bool StopComponent(string? component)
+    {
+        if (!string.IsNullOrEmpty(component)) return false;
+        IsRunning = false;
+        return true;
     }
 
     public override bool TrySetValue<T>(string name, T value, string? component, out string? reason)

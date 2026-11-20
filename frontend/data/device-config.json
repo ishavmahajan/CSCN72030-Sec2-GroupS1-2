@@ -1,0 +1,100 @@
+{
+  "version": "1.0",
+  "devices": [
+    {
+      "deviceType": "WALK_IN_FREEZER",
+      "status": "active",
+      "modes": [{"value":"NORMAL","label":"Normal"},{"value":"ENERGY_SAVER","label":"Energy Saver"},{"value":"FAST_FREEZE","label":"Fast Freeze"},{"value":"DEFROST","label":"Defrost"}],
+      "commands": [
+        {"commandName":"start","label":"Start Freezer","componentRequired":false},
+        {"commandName":"stop","label":"Stop Freezer","componentRequired":false},
+        {"commandName":"setValue","label":"Set Temperature","pointName":"setpoint","valueType":"number","unit":"C","min":-25,"max":-15,"componentRequired":false},
+        {"commandName":"setMode","label":"Change Mode","valueType":"string","componentRequired":false},
+        {"commandName":"isOnline","label":"Request Current Status","componentRequired":false}
+      ]
+    },
+    {
+      "deviceType": "STOVE",
+      "status": "onHold",
+      "modes": [],
+      "commands": [
+      ]
+    },
+    {
+      "deviceType": "OVEN",
+      "status": "active",
+      "modes": [{"value":"BAKE","label":"Bake"},{"value":"ROAST","label":"Roast"},{"value":"BROIL","label":"Broil"},{"value":"CONVECTION","label":"Convection"},{"value":"KEEP_WARM","label":"Keep Warm"}],
+      "commands": [
+        {"commandName":"setValue","label":"Set Temperature Reading","pointName":"temperature","valueType":"number","unit":"C","min":50,"max":220,"componentRequired":false},
+        {"commandName":"setValue","label":"Set Temperature","pointName":"setpoint","valueType":"number","unit":"C","min":50,"max":220,"componentRequired":false},
+        {"commandName":"setValue","label":"Set Timer","pointName":"timer","valueType":"number","unit":"s","min":0,"max":1800,"componentRequired":false},
+        {"commandName":"setValue","label":"Set Door State","pointName":"door","valueType":"string","componentRequired":false,"options":[{"value":"closed","label":"Closed"},{"value":"open","label":"Open"}]},
+        {"commandName":"start","label":"Start Oven","componentRequired":false},
+        {"commandName":"stop","label":"Stop Oven","componentRequired":false},
+        {"commandName":"setMode","label":"Change Mode","valueType":"string","componentRequired":false},
+        {"commandName":"isOnline","label":"Request Current Status","componentRequired":false}
+      ]
+    },
+    {
+      "deviceType": "MIXER",
+      "status": "active",
+      "modes": [{"value":"STIR","label":"Stir"},{"value":"BEAT","label":"Beat"},{"value":"WHIP","label":"Whip"},{"value":"KNEAD","label":"Knead"}],
+      "commands": [
+        {"commandName":"setValue","label":"Set Speed","pointName":"speed","valueType":"number","unit":"rpm","min":0,"max":240,"componentRequired":false},
+        {"commandName":"setValue","label":"Set Motor State","pointName":"motor","valueType":"string","componentRequired":false,"options":[{"value":"on","label":"On"},{"value":"off","label":"Off"}]},
+        {"commandName":"start","label":"Start Mixer","componentRequired":false},
+        {"commandName":"stop","label":"Stop Mixer","componentRequired":false},
+        {"commandName":"setMode","label":"Change Mode","valueType":"string","componentRequired":false},
+        {"commandName":"isOnline","label":"Request Current Status","componentRequired":false}
+      ]
+    },
+    {
+      "deviceType": "EXHAUST_FAN",
+      "status": "active",
+      "modes": [],
+      "commands": [
+        {"commandName":"setValue","label":"Set Fan Speed","pointName":"fanSpeed","valueType":"number","unit":"%","min":0,"max":100,"componentRequired":false},
+        {"commandName":"setValue","label":"Set Power State","pointName":"powerState","valueType":"string","componentRequired":false,"options":[{"value":"on","label":"On"},{"value":"off","label":"Off"}]},
+        {"commandName":"start","label":"Start Fan","componentRequired":false},
+        {"commandName":"stop","label":"Stop Fan","componentRequired":false},
+        {"commandName":"isOnline","label":"Request Current Status","componentRequired":false}
+      ]
+    },
+    {
+      "deviceType": "BLENDER",
+      "status": "active",
+      "modes": [{"value":"LOW","label":"Low"},{"value":"MEDIUM","label":"Medium"},{"value":"HIGH","label":"High"},{"value":"PULSE","label":"Pulse"}],
+      "commands": [
+        {"commandName":"setValue","label":"Set Speed","pointName":"speed","valueType":"number","unit":"rpm","min":0,"max":16000,"componentRequired":false},
+        {"commandName":"setValue","label":"Set Motor State","pointName":"motor","valueType":"string","componentRequired":false,"options":[{"value":"on","label":"On"},{"value":"off","label":"Off"}]},
+        {"commandName":"start","label":"Start Blender","componentRequired":false},
+        {"commandName":"stop","label":"Stop Blender","componentRequired":false},
+        {"commandName":"setMode","label":"Change Mode","valueType":"string","componentRequired":false},
+        {"commandName":"isOnline","label":"Request Current Status","componentRequired":false}
+      ]
+    },
+    {
+      "deviceType": "DISHWASHER",
+      "status": "active",
+      "modes": [{"value":"QUICK","label":"Quick"},{"value":"NORMAL","label":"Normal"},{"value":"HEAVY","label":"Heavy"},{"value":"ECO","label":"Eco"},{"value":"SELF_CLEAN","label":"Self Clean"}],
+      "commands": [
+        {"commandName":"start","label":"Start Cycle","componentRequired":false},
+        {"commandName":"stop","label":"Stop Cycle","componentRequired":false},
+        {"commandName":"setMode","label":"Change Mode","valueType":"string","componentRequired":false},
+        {"commandName":"setValue","label":"Set Temperature Target","pointName":"setpoint","valueType":"number","unit":"C","min":50,"max":70,"componentRequired":false},
+        {"commandName":"setValue","label":"Set Cycle","pointName":"cycle","valueType":"string","options":[{"value":"idle","label":"Idle"},{"value":"washing","label":"Washing"},{"value":"rinsing","label":"Rinsing"},{"value":"drying","label":"Drying"},{"value":"completed","label":"Completed"}],"componentRequired":false},
+        {"commandName":"isOnline","label":"Request Current Status","componentRequired":false}
+      ]
+    },
+    {
+      "deviceType": "SINK",
+      "status": "active",
+      "modes": [{"value":"MANUAL","label":"Manual"},{"value":"AUTO_FILL","label":"Auto Fill"},{"value":"WASH","label":"Wash"},{"value":"RINSE","label":"Rinse"},{"value":"SANITIZE","label":"Sanitize"},{"value":"DRAIN","label":"Drain"}],
+      "commands": [
+        {"commandName":"setMode","label":"Change Mode","valueType":"string","componentRequired":false},
+        {"commandName":"setValue","label":"Set Temperature Target","pointName":"setpoint","valueType":"number","unit":"C","min":20,"max":50,"componentRequired":false},
+        {"commandName":"isOnline","label":"Request Current Status","componentRequired":false}
+      ]
+    }
+  ]
+}

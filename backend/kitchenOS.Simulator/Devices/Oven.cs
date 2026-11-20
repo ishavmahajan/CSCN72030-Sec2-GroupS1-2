@@ -40,10 +40,10 @@ public class Oven : SimulatedDevice
         Random random = new Random();
         JsonElement json = _json;
         Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), Temperature, false);
-        Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
+        // Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
         Timer = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "timer"), Timer, false);
         Door = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "door"));
-        Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
+        // Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
         Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
         Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), Energy, false);
     }
@@ -93,16 +93,6 @@ public class Oven : SimulatedDevice
             reason = null;
             return true;
         }
-        if (name == "mode" && value is string mode)
-        {
-            Mode = mode;
-            reason = null;
-            return true;
-        }
-
-        
-        
-
         reason = "unknown property";
         return false;
     }
