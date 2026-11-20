@@ -1,10 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Clock3, Fan, Gauge, Layers3, LayoutGrid, Menu, Play, Power, Settings, SlidersHorizontal, Snowflake, Square, Utensils, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Activity, AlertTriangle, Bell, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, Clock3, Fan, Gauge, Layers3, LayoutGrid, Menu, Power, Settings, Snowflake, Square, Utensils, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
+import { DeviceCommandControls, type DevicePoint } from '../components/device-command-controls'
+import { CommandToasts } from '../components/command-toasts'
+import { capabilityProvider, type CommandRequest, type DeviceProfile } from '../lib/device-capabilities'
+import { useDeviceCommands, type CommandResult } from '../lib/use-device-commands'
 
 type Device = {
   id: string
+  deviceType: string
   name: string
   description: string
   type: string
@@ -14,17 +19,16 @@ type Device = {
   icon: LucideIcon
   color: string
   mode: string
-  modes: string[]
+  points: DevicePoint[]
   power: string
   energy: string
-  setpoint: number
-  hasSetpoint: boolean
+  setpoint?: number
   door?: string
+  acknowledgedRunning?: boolean
 }
 
-type DevicePoint = { name: string; value: unknown; unit?: string | null; component?: string | null }
 type ApiDevice = { deviceId: string; deviceName: string; deviceType: string; description: string; readPoints: DevicePoint[] }
-type DeviceEvent = { deviceId: string; message?: { values?: DevicePoint[] } }
+type DeviceEvent = { eventName?: string; deviceId: string; message?: Partial<CommandResult> & { values?: DevicePoint[] } }
 
 const deviceMetadata: Record<string, { icon: LucideIcon; color: string; type: string }> = {
   WALK_IN_FREEZER: { icon: Snowflake, color: 'blue', type: 'Cold storage' },
@@ -40,24 +44,57 @@ const deviceMetadata: Record<string, { icon: LucideIcon; color: string; type: st
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 function findPoint(points: DevicePoint[], ...names: string[]) {
-  return points.find((item) => names.includes(item.name))
+  for (const name of names) {
+    const point = points.find((item) => item.name === name)
+    if (point) return point
+  }
 }
 
 function displayValue(value: unknown) {
   return typeof value === 'number' ? String(Math.round(value * 100) / 100) : String(value ?? '')
 }
 
+const deviceTypeAliases: Record<string, string> = {
+  WalkInFreezer: 'WALK_IN_FREEZER',
+  Stove: 'STOVE',
+  Oven: 'OVEN',
+  Mixer: 'MIXER',
+  ExhaustFan: 'EXHAUST_FAN',
+  Blender: 'BLENDER',
+  Dishwasher: 'DISHWASHER',
+  Sink: 'SINK',
+}
+
+function getConfiguredDeviceType(deviceType: string) {
+  return deviceTypeAliases[deviceType] ?? deviceType.toUpperCase()
+}
+
+const runningPointNames = ['isRunning', 'motor', 'powerState', 'cycle', 'mode']
+
+function isRunning(device: Device): boolean | undefined {
+  if (device.acknowledgedRunning !== undefined) return device.acknowledgedRunning
+  const runningPoint = findPoint(device.points, 'isRunning')?.value
+  if (typeof runningPoint === 'boolean') return runningPoint
+
+  const state = runningPointNames.slice(1)
+    .map((name) => findPoint(device.points, name)?.value)
+    .find((value) => typeof value === 'string' && value.trim())
+  if (typeof state !== 'string') return undefined
+  return !['off', 'stopped', 'idle', 'completed', 'complete', 'fault'].includes(state.trim().toLowerCase())
+}
+
 function createDevice(device: ApiDevice): Device {
-  const metadata = deviceMetadata[device.deviceType] ?? { icon: Activity, color: 'blue', type: device.deviceType }
+  const configuredDeviceType = getConfiguredDeviceType(device.deviceType)
+  const metadata = deviceMetadata[configuredDeviceType] ?? { icon: Activity, color: 'blue', type: device.deviceType }
   const reading = findPoint(device.readPoints, 'temperature') ?? findPoint(device.readPoints, 'speed', 'fanSpeed', 'flow', 'airflow', 'waterLevel', 'heating', 'motor', 'compressor', 'cycle', 'valve')
   const power = findPoint(device.readPoints, 'power')
   const energy = findPoint(device.readPoints, 'energy')
   const setpoint = findPoint(device.readPoints, 'setpoint')
   const door = findPoint(device.readPoints, 'door')
   const mode = findPoint(device.readPoints, 'mode', 'powerState')
-
   return {
     id: device.deviceId,
+    deviceType: configuredDeviceType,
     name: device.deviceName,
     description: device.description,
     type: metadata.type,
@@ -66,17 +103,21 @@ function createDevice(device: ApiDevice): Device {
     status: 'Online',
     icon: metadata.icon,
     color: metadata.color,
-    mode: mode ? displayValue(mode.value) : 'Idle',
-    modes: mode ? [displayValue(mode.value)] : ['Idle'],
+    mode: displayValue(mode?.value),
+    points: device.readPoints,
     power: power ? `${displayValue(power.value)} ${power.unit ?? ''}`.trim() : '—',
     energy: energy ? `${displayValue(energy.value)} ${energy.unit ?? ''}`.trim() : '—',
-    setpoint: typeof setpoint?.value === 'number' ? setpoint.value : 0,
-    hasSetpoint: Boolean(setpoint),
+    setpoint: typeof setpoint?.value === 'number' ? setpoint.value : undefined,
     door: door ? displayValue(door.value) : undefined,
   }
 }
 
-function updateDevice(device: Device, points: DevicePoint[]): Device {
+function updateDevice(device: Device, updates: DevicePoint[]): Device {
+  const points = [
+    ...device.points.filter((previous) => !updates.some((point) =>
+      point.name === previous.name && (point.component ?? null) === (previous.component ?? null))),
+    ...updates,
+  ]
   const reading = findPoint(points, 'temperature') ?? findPoint(points, 'speed', 'fanSpeed', 'flow', 'airflow', 'waterLevel', 'heating', 'motor', 'compressor', 'cycle', 'valve')
   const power = findPoint(points, 'power')
   const energy = findPoint(points, 'energy')
@@ -93,13 +134,37 @@ function updateDevice(device: Device, points: DevicePoint[]): Device {
     setpoint: typeof setpoint?.value === 'number' ? setpoint.value : device.setpoint,
     door: door ? displayValue(door.value) : device.door,
     mode: mode ? displayValue(mode.value) : device.mode,
-    modes: mode ? [displayValue(mode.value)] : device.modes,
+    points,
   }
+}
+
+function applyAcknowledgedCommand(device: Device, request: CommandRequest): Device {
+  const { commandName, arguments: args } = request
+  if (commandName === 'start' || commandName === 'stop') {
+    if (args.component) return device
+    const running = commandName === 'start'
+    // The simulator's mixer lifecycle methods set the motor directly.
+    if (device.deviceType === 'MIXER') {
+      return { ...updateDevice(device, [{ name: 'motor', value: running ? 'on' : 'off' }]), acknowledgedRunning: undefined }
+    }
+    return { ...device, acknowledgedRunning: running }
+  }
+  if (commandName !== 'setMode' && commandName !== 'setValue') return device
+  const name = commandName === 'setMode' ? 'mode' : args.name
+  const value = commandName === 'setMode' ? args.mode : args.value
+  const unit = commandName === 'setValue' ? args.unit : undefined
+
+  const previous = device.points.find((point) => point.name === name && (point.component ?? null) === (args.component ?? null))
+  const updated = updateDevice(device, [{ name, value, component: args.component, unit: unit ?? previous?.unit }])
+  // A freezer mode change does not change its independent running state.
+  return device.deviceType !== 'WALK_IN_FREEZER' && runningPointNames.includes(name)
+    ? { ...updated, acknowledgedRunning: undefined }
+    : updated
 }
 
 function StatusPill({ status }: { status: Device['status'] }) { return <span className={`status-pill ${status === 'Online' ? 'online' : 'offline'}`}><i />{status}</span> }
 
-function DeviceCard({ device, selected, running, connected, onSelect }: { device: Device; selected: boolean; running: boolean; connected: boolean; onSelect: () => void }) {
+function DeviceCard({ device, selected, running, connected, onSelect }: { device: Device; selected: boolean; running: boolean | undefined; connected: boolean; onSelect: () => void }) {
   const Icon = device.icon
   const unit = device.unit === 'C' ? '°C' : device.unit
   return <button aria-pressed={selected} className={`device-card ${selected ? 'selected' : ''} ${!connected ? 'disconnected' : ''}`} onClick={onSelect}>
@@ -114,28 +179,67 @@ function DeviceCard({ device, selected, running, connected, onSelect }: { device
       <span key={`${device.value}-${device.power}-${device.energy}`} className="device-reading"><span>{device.value || '—'}</span><small>{unit}</small></span>
     </span>
     <span className="device-card-foot">
-      <span className={`operating-state ${running ? 'running' : 'idle'}`}>{running ? 'Running' : 'Stopped'}</span>
+      <span className={`operating-state ${running ? 'running' : 'idle'}`}>{running === undefined ? 'State unknown' : running ? 'Running' : 'Stopped'}</span>
       <StatusPill status={connected ? 'Online' : 'Offline'} />
       <span className="freshness">Just now</span>
     </span>
   </button>
 }
 
-function DetailPanel({ device, connected, running, pending, setpoint, mode, onToggle, onModeChange, onEditSetpoint }: { device: Device; connected: boolean; running: boolean; pending: boolean; setpoint: number; mode: string; onToggle: () => void; onModeChange: (mode: string) => void; onEditSetpoint: () => void }) {
+function DetailPanel({ device, connected, children }: { device: Device; connected: boolean; children: React.ReactNode }) {
   const Icon = device.icon
   const reading = device.unit ? `${device.value}${device.unit === 'C' ? '°C' : device.unit}` : device.value
-  return <section className="detail-panel"><div className="detail-header"><div className="detail-title"><Icon size={27} /><div><h2>{device.name}</h2><p>{device.description}</p></div></div><div className="detail-statuses"><span className={`operating-state ${running ? 'running' : 'idle'}`}>{running ? 'Running' : 'Stopped'}</span><StatusPill status={connected ? 'Online' : 'Offline'} /></div></div><div className="detail-main"><div className="reading-display"><div className="reading-highlight"><span>{reading}</span><b>{device.unit ? 'Live reading' : 'Current state'}</b><small>Updated just now</small>{device.hasSetpoint && <p>Setpoint: <strong>{setpoint} °C</strong></p>}</div></div><div className="detail-stats"><div><Clock3 /><span>Device ID<strong title={device.id}>{device.id.slice(0, 8)}…</strong></span></div><div><Waves /><span>Mode<select aria-label={`Change mode for ${device.name}`} value={mode} onChange={(event) => onModeChange(event.target.value)} disabled={!connected || pending}>{device.modes.map((option) => <option key={option}>{option}</option>)}</select></span></div>{device.door && <div><Square /><span>Door<strong>{device.door}</strong></span></div>}</div></div><div className="detail-metrics"><div><Zap /><span>Power<strong>{device.power}</strong></span></div><div><Layers3 /><span>Energy<strong>{device.energy}</strong></span></div></div><div className="detail-actions"><button className={running ? 'stop-action' : 'primary-action'} onClick={onToggle} disabled={!connected || pending}>{pending ? <Activity className="spin" size={17} /> : running ? <Square size={15} fill="currentColor" /> : <Play size={17} fill="currentColor" />} {pending ? 'Sending command…' : running ? 'Stop equipment' : 'Start equipment'}</button>{device.hasSetpoint && <button onClick={onEditSetpoint} disabled={!connected || pending}><SlidersHorizontal size={17} /> Setpoint</button>}</div></section>
+  const running = isRunning(device)
+  const motor = device.deviceType === 'MIXER' ? displayValue(findPoint(device.points, 'motor')?.value).trim() : ''
+
+  return <section className="detail-panel">
+    <div className="detail-header">
+      <div className="detail-title"><Icon size={27} /><div><h2>{device.name}</h2><p>{device.description}</p></div></div>
+      <div className="detail-statuses">
+        <span className={`operating-state ${running ? 'running' : 'idle'}`}>{running === undefined ? 'State unknown' : running ? 'Running' : 'Stopped'}</span>
+        <StatusPill status={connected ? 'Online' : 'Offline'} />
+      </div>
+    </div>
+    <div className="detail-main">
+      <div className="reading-display"><div className="reading-highlight">
+        <span>{reading || '—'}</span><b>{device.unit ? 'Primary reading' : 'Current state'}</b>
+        {device.setpoint !== undefined && <p>Setpoint <strong>{device.setpoint} °C</strong></p>}
+      </div></div>
+      <div className="detail-stats">
+        <div><Clock3 /><span>Device ID<strong>{device.id}</strong></span></div>
+        {device.mode && <div><Waves /><span>Reported mode<strong>{device.mode}</strong></span></div>}
+        {motor && <div><Activity /><span>Motor state<strong>{motor === 'on' ? 'On' : motor === 'off' ? 'Off' : motor}</strong></span></div>}
+        {device.door && <div><Square /><span>Door<strong>{device.door}</strong></span></div>}
+      </div>
+    </div>
+    <div className="detail-metrics"><div><Zap /><span>Power<strong>{device.power}</strong></span></div><div><Layers3 /><span>Energy<strong>{device.energy}</strong></span></div></div>
+    {children}
+  </section>
 }
 
 export default function Page() {
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedId, setSelectedId] = useState('')
-  const [running, setRunning] = useState<Record<string, boolean>>({})
-  const [pendingId, setPendingId] = useState('')
-  const [setpoints, setSetpoints] = useState<Record<string, number>>({})
-  const [modes, setModes] = useState<Record<string, string>>({})
+  const [profiles, setProfiles] = useState<readonly DeviceProfile[]>([])
+  const [capabilityStatus, setCapabilityStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
+  const applyAcknowledgement = useCallback((deviceId: string, request: CommandRequest) => {
+    setDevices((current) => current.map((device) =>
+      device.id === deviceId ? applyAcknowledgedCommand(device, request) : device))
+  }, [])
+  const { pendingDevices, toasts, dismissToast, receiveResult, submit } = useDeviceCommands(apiUrl, applyAcknowledgement)
   const [connected, setConnected] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+
+  useEffect(() => {
+    let disposed = false
+    capabilityProvider.load().then((items) => {
+      if (disposed) return
+      setProfiles(items)
+      setCapabilityStatus('ready')
+    }).catch(() => {
+      if (!disposed) setCapabilityStatus('unavailable')
+    })
+  }, [])
 
   useEffect(() => {
     let disposed = false
@@ -152,9 +256,6 @@ export default function Page() {
         const nextDevices = items.map(createDevice)
         setDevices(nextDevices)
         setSelectedId((current) => current || nextDevices[0]?.id || '')
-        setRunning(Object.fromEntries(nextDevices.map((device) => [device.id, device.mode.toLowerCase() !== 'off'])))
-        setSetpoints(Object.fromEntries(nextDevices.map((device) => [device.id, device.setpoint])))
-        setModes(Object.fromEntries(nextDevices.map((device) => [device.id, device.mode])))
       })
       .catch((error) => console.error('Could not load devices', error))
 
@@ -164,9 +265,21 @@ export default function Page() {
     socket.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as DeviceEvent
-        const values = message.message?.values
+        const body = message.message
+        if (message.eventName === 'command_result' && body?.commandId && body.status) {
+          receiveResult(message.deviceId, { commandId: body.commandId, status: body.status, reason: body.reason })
+          return
+        }
+        const values = body?.values
         if (!message.deviceId || !values) return
-        setDevices((current) => current.map((device) => device.id === message.deviceId ? updateDevice(device, values) : device))
+        setDevices((current) => current.map((device) => {
+          if (device.id !== message.deviceId) return device
+          const updated = updateDevice(device, values)
+          const statePoints = device.deviceType === 'WALK_IN_FREEZER' ? ['isRunning'] : runningPointNames
+          return values.some((point) => statePoints.includes(point.name))
+            ? { ...updated, acknowledgedRunning: undefined }
+            : updated
+        }))
       } catch (error) {
         console.error('Could not parse device event', error)
       }
@@ -178,23 +291,14 @@ export default function Page() {
     }
   }, [])
 
-  const selected = useMemo(() => devices.find((device) => device.id === selectedId) ?? devices[0], [selectedId, devices])
-  const toggle = (id: string) => {
-    const nextRunning = !running[id]
-    if (!nextRunning && !window.confirm(`Stop ${selected?.name}? The equipment will stop operating.`)) return
-    setPendingId(id)
-    window.setTimeout(() => {
-      setRunning((current) => ({ ...current, [id]: nextRunning }))
-      setPendingId('')
-    }, 650)
-  }
-  const changeMode = (id: string, mode: string) => setModes((current) => ({ ...current, [id]: mode }))
+  const selected = devices.find((device) => device.id === selectedId) ?? devices[0]
   const online = connected ? devices.length : 0
   const today = new Intl.DateTimeFormat('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date())
 
   if (!selected) return <main className="app-shell"><section className="main-area"><div className="page-content"><p>Loading kitchen devices…</p></div></section></main>
 
   const navItems = [{ label: 'Overview', icon: LayoutGrid }, { label: 'Equipment', icon: ClipboardList }, { label: 'Alarms', icon: Bell }, { label: 'Trends', icon: Activity }, { label: 'Events', icon: ClipboardList }, { label: 'Settings', icon: Settings }]
+  const profile = profiles.find((item) => item.deviceType === selected.deviceType)
 
   return <main className="app-shell">
     <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
@@ -216,17 +320,23 @@ export default function Page() {
         <section className={`alarm-summary ${connected ? '' : 'unavailable'}`} id="alarms">{connected ? <CheckCircle2 size={22} /> : <WifiOff size={22} />}<div><strong>{connected ? 'No active alarms' : 'Alarm status unavailable'}</strong><span>{connected ? 'All monitored equipment is within normal operating limits.' : 'Reconnect to resume alarm monitoring.'}</span></div><span className="alarm-count">{connected ? '0' : '—'}</span></section>
         <section className="kpi-row">
           <div className="kpi"><span className="kpi-icon"><Layers3 /></span><div><b>{online} / {devices.length}</b><small>Equipment online</small><em>{connected ? 'Updated just now' : 'Telemetry unavailable'}</em></div></div>
-          <div className="kpi"><span className="kpi-icon"><Fan /></span><div><b>{Object.values(running).filter(Boolean).length}</b><small>Equipment running</small><em>Current operating state</em></div></div>
+          <div className="kpi"><span className="kpi-icon"><Fan /></span><div><b>{devices.filter(isRunning).length}</b><small>Equipment running</small><em>Current operating state</em></div></div>
           <div className="kpi"><span className="kpi-icon"><AlertTriangle /></span><div><b>0</b><small>Active alarms</small><em>No unacknowledged alarms</em></div></div>
           <div className="kpi"><span className="kpi-icon"><Activity /></span><div><b>{selected.type}</b><small>Selected equipment</small><em>Updated just now</em></div></div>
         </section>
         <div className="dashboard-grid">
-          <section id="equipment" className="equipment-section"><div className="section-title"><div><h1><LayoutGrid size={22} /> Equipment Overview</h1><p>Normal equipment is quiet; exceptions appear prominently.</p></div><span className={`live-label ${connected ? '' : 'offline'}`}>{connected ? 'Live' : 'Offline'}</span></div><div className="devices-grid">{devices.map((device) => <DeviceCard key={device.id} device={device} selected={device.id === selectedId} running={Boolean(running[device.id])} connected={connected} onSelect={() => setSelectedId(device.id)} />)}</div></section>
-          <DetailPanel device={selected} connected={connected} running={Boolean(running[selected.id])} pending={pendingId === selected.id} setpoint={setpoints[selected.id] ?? selected.setpoint} mode={modes[selected.id] ?? selected.mode} onToggle={() => toggle(selected.id)} onModeChange={(mode) => changeMode(selected.id, mode)} onEditSetpoint={() => {}} />
+          <section id="equipment" className="equipment-section"><div className="section-title"><div><h1><LayoutGrid size={22} /> Equipment Overview</h1><p>Normal equipment is quiet; exceptions appear prominently.</p></div><span className={`live-label ${connected ? '' : 'offline'}`}>{connected ? 'Live' : 'Offline'}</span></div><div className="devices-grid">{devices.map((device) => <DeviceCard key={device.id} device={device} selected={device.id === selectedId} running={isRunning(device)} connected={connected} onSelect={() => setSelectedId(device.id)} />)}</div></section>
+          <DetailPanel device={selected} connected={connected}>
+            {capabilityStatus === 'ready'
+              ? <DeviceCommandControls key={selected.id} profile={profile} points={selected.points} deviceName={selected.name} running={isRunning(selected)}
+                  disabled={!connected || pendingDevices.has(selected.id)} onSubmit={(request) => void submit(selected.id, selected.name, request)} />
+              : <p className="command-feedback" role="status">{capabilityStatus === 'loading' ? 'Loading equipment controls…' : 'Equipment controls could not be loaded.'}</p>}
+          </DetailPanel>
         </div>
         <section className="info-panel events"><div className="panel-title"><h2><ClipboardList size={20} /> Recent Events</h2><button>View history →</button></div><div className="event-row"><i /> <span>{connected ? 'Receiving live equipment telemetry' : 'Connection lost — displaying last known values'}</span><time>Now</time></div></section>
         <footer><span><span className="online-dot" /> KitchenOS v1.0</span><span>Last updated just now · <strong>{connected ? 'Connected' : 'Disconnected'}</strong></span></footer>
       </div>
     </section>
+    <CommandToasts toasts={toasts} onDismiss={dismissToast} />
   </main>
 }

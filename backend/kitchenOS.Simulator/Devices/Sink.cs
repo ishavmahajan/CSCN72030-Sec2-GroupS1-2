@@ -42,8 +42,8 @@ public class Sink : SimulatedDevice
         Random random = new Random();
         JsonElement json = _json;
         Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), Temperature, false);
-        Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
-        Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
+        // Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
+        // Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
         Flow = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "flow"), Flow, false);
         Consumption = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "consumption"), Consumption, false);
         Leak = DeviceJson.Pick(random, DeviceJson.ReadBoolList(json, "leak"), Leak, false);

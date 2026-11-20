@@ -51,7 +51,7 @@ public class Dishwasher : SimulatedDevice
             new PointReading("detergent", Detergent, "%", null),
             new PointReading("power", Power, "W", null),
             new PointReading("energy", Energy, "kWh", null)
-            
+
         };
     }
 
@@ -94,9 +94,9 @@ public class Dishwasher : SimulatedDevice
         Random random = new Random();
         JsonElement json = _json;
         Temperature = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "temperature"), Temperature, false);
-        Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
+        // Setpoint = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "setpoint"), Setpoint, false);
         Cycle = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "cycle"));
-        Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"), Mode, false);
+        // Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"), Mode, false);
         WaterLevel = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "waterLevel"), WaterLevel, false);
         Detergent = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "detergent"), Detergent, false);
         Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);

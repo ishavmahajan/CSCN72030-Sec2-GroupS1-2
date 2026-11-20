@@ -201,6 +201,8 @@ public class DeviceSimulator : IDeviceSimulator
                 break;
         }
 
+
+
         await PublishResult(command, device, accepted ? "acknowledged" : "rejected", reason, cancellationToken);
     }
 

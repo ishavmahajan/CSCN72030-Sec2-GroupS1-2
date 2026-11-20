@@ -39,7 +39,7 @@ public class Blender : SimulatedDevice
         Random random = new Random();
         JsonElement json = _json;
         Motor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "motor"));
-        Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
+        // Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
         Speed = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "speed"), Speed, false);
         Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
         Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), Energy, false);
