@@ -7,6 +7,8 @@ using kitchenOS_Scada.Api.Helpers;
 using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Features.Devices;
+using kitchenOS_Scada.Api.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Register the MVC and OpenAPI services used by the HTTP API.
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
+builder.Services.AddKitchenOsPersistence(builder.Configuration);
 
 // Keep the simulator and command service in-process so API requests can use the
 // same device state that produces telemetry for connected clients.
@@ -57,6 +60,16 @@ builder.Services.AddHostedService<MessageBusService>();
 
 var app = builder.Build();
 
+// Apply pending EF Core migrations before the API begins accepting requests.
+// This keeps the database schema synchronized with the deployed application.
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    KitchenOsDbContext dbContext = scope.ServiceProvider
+        .GetRequiredService<KitchenOsDbContext>();
+
+    await dbContext.Database.MigrateAsync();
+}
+
 // Load the initial simulation before serving requests so device endpoints have
 // a complete, consistent view of the simulated devices.
 var simulator = app.Services.GetRequiredService<DeviceSimulator>();
@@ -85,6 +98,22 @@ app.MapGet("/health", () =>
     return Results.Ok(new { status = "Healthy" });
 })
 .WithName("GetHealth");
+
+// Keep database readiness separate from process liveness so orchestration can
+// distinguish an unavailable dependency from a stopped API process.
+app.MapGet("/health/database", async (
+    KitchenOsDbContext dbContext,
+    CancellationToken cancellationToken) =>
+{
+    bool canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
+
+    return canConnect
+        ? Results.Ok(new { status = "Healthy" })
+        : Results.Problem(
+            "PostgreSQL is unavailable.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+})
+.WithName("GetDatabaseHealth");
 
 // Accept WebSocket clients and remove them from the notifier when they close
 // normally, disconnect unexpectedly, or cancel the request.
