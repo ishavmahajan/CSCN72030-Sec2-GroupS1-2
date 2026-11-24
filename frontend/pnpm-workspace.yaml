@@ -3,3 +3,8 @@ pmOnFail: ignore
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
+
+
+# Keep the CLI glob matcher on the patched release.
+overrides:
+  "@ts-morph/common>minimatch": 11.0.1
