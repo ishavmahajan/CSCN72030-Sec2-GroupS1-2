@@ -52,6 +52,9 @@ services:
       ASPNETCORE_URLS: http://+:8080
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
       DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+      Authentication__Authority: ${AUTH_AUTHORITY:-}
+      Authentication__Audience: ${AUTH_AUDIENCE:-}
+      Authentication__RoleClaimType: ${AUTH_ROLE_CLAIM_TYPE:-roles}
       ConnectionStrings__Redis: redis:6379
       ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
 
@@ -111,3 +114,4 @@ services:
 
 volumes:
   postgres-data:
+

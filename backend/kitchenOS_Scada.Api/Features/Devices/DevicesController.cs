@@ -3,10 +3,13 @@ using kitchenOS_Scada.Api.Features.Devices.Queries;
 using kitchenOS_Scada.Api.Features.Devices.Registration;
 using kitchenOS_Scada.Api.Features.Devices.Removal;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using kitchenOS_Scada.Api.Security;
 using StackExchange.Redis;
 
 namespace kitchenOS_Scada.Api.Features.Devices;
 
+[Authorize(Policy = AuthorizationPolicies.Monitor)]
 [ApiController]
 [Route("devices")]
 public sealed class DevicesController : ControllerBase
@@ -54,6 +57,7 @@ public sealed class DevicesController : ControllerBase
 
     /// <summary>Registers a device in the persisted inventory.</summary>
     [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.Administer)]
     [ProducesResponseType<DeviceInventoryResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -67,6 +71,7 @@ public sealed class DevicesController : ControllerBase
 
     /// <summary>Removes a device from the active persisted inventory.</summary>
     [HttpDelete("{deviceId}")]
+    [Authorize(Policy = AuthorizationPolicies.Administer)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -80,6 +85,7 @@ public sealed class DevicesController : ControllerBase
 
     /// <summary>Rejects command requests that do not specify a device ID.</summary>
     [HttpPost("commands")]
+    [Authorize(Policy = AuthorizationPolicies.Operate)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public IActionResult SendCommandWithoutDeviceId()
     {
@@ -88,6 +94,7 @@ public sealed class DevicesController : ControllerBase
 
     /// <summary>Queues a command for a simulated device.</summary>
     [HttpPost("{deviceId}/commands")]
+    [Authorize(Policy = AuthorizationPolicies.Operate)]
     [ProducesResponseType<QueuedDeviceCommandResponse>(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -140,3 +147,4 @@ public sealed class DevicesController : ControllerBase
         }
     }
 }
+

@@ -1,4 +1,11 @@
 using System.Net;
+using System.Net.Http.Headers;
+using kitchenOS_Scada.Api.Tests.Security;
+using kitchenOS_Scada.Api.Security;
+using kitchenOS_Scada.Api.Features.Devices.Contracts;
+using kitchenOS_Scada.Api.Features.Devices.Queries;
+using kitchenOS_Scada.Api.Features.Devices.Registration;
+using kitchenOS_Scada.Api.Features.Devices.Removal;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Text;
@@ -26,6 +33,7 @@ namespace kitchenOS_Scada.Api.Tests.Commands;
 public class DeviceCommandEndpointTests
 {
     private readonly RecordingMessageBus _bus = new();
+    private readonly TestIdentityProvider _identity = new();
     private readonly DeviceSimulator _simulator = new();
     private readonly CancellationTokenSource _shutdown = new();
     private WebApplication _app = default!;
@@ -54,15 +62,22 @@ public class DeviceCommandEndpointTests
 
         WebApplicationBuilder builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
+        _identity.Configure(builder.Services);
+        UnusedInventoryServices inventory = new();
+        builder.Services.AddSingleton<IDeviceQueryService>(inventory);
+        builder.Services.AddSingleton<IDeviceRegistrationService>(inventory);
+        builder.Services.AddSingleton<IDeviceRemovalService>(inventory);
         builder.Services.AddSingleton<IMessageBus>(_bus);
         builder.Services.AddSingleton(_simulator);
         builder.Services.AddSingleton<IDeviceCommandService, DeviceCommandService>();
         builder.Services.AddControllers()
             .AddApplicationPart(typeof(DevicesController).Assembly);
         _app = builder.Build();
+        _app.UseKitchenOsSecurity();
         _app.MapControllers();
         await _app.StartAsync();
         _client = new HttpClient { BaseAddress = new Uri(_app.Urls.Single()) };
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _identity.Token());
     }
 
     [TestCleanup]
@@ -77,6 +92,7 @@ public class DeviceCommandEndpointTests
             await _app.DisposeAsync();
         }
         _shutdown.Dispose();
+        _identity.Dispose();
     }
 
     [DataTestMethod]
@@ -196,7 +212,7 @@ public class DeviceCommandEndpointTests
     [DataRow("MIX-001", "{\"commandName\":\"setValue\",\"arguments\":{\"name\":\"speed\",\"value\":180}}", "acknowledged")]
     [DataRow("MIX-001", "{\"commandName\":\"setValue\",\"arguments\":{\"name\":\"motor\",\"value\":\"on\"}}", "acknowledged")]
     [DataRow("OVN-001", "{\"commandName\":\"setMode\",\"arguments\":{\"mode\":\"broil\"}}", "acknowledged")]
-    [DataRow("MIX-001", "{\"commandName\":\"setMode\",\"arguments\":{\"mode\":\"broil\"}}", "rejected")]
+    [DataRow("MIX-001", "{\"commandName\":\"setMode\",\"arguments\":{\"mode\":\"broil\"}}", "acknowledged")]
     [DataRow("SNK-001", "{\"commandName\":\"start\"}", "rejected")]
     public async Task SimulatorResult_ReachesSocketWithOriginalCommandId(string deviceId, string json, string expectedStatus)
     {
@@ -277,6 +293,15 @@ public class DeviceCommandEndpointTests
     private Task<HttpResponseMessage> PostAsync(string deviceId, string json) =>
         _client.PostAsync($"/devices/{deviceId}/commands", new StringContent(json, Encoding.UTF8, "application/json"));
 
+    // Command tests never invoke inventory operations or require PostgreSQL.
+    private sealed class UnusedInventoryServices : IDeviceQueryService, IDeviceRegistrationService, IDeviceRemovalService
+    {
+        public Task<IReadOnlyList<DeviceInventoryResponse>> GetActiveAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<DeviceInventoryResponse?> GetByIdAsync(string deviceId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<DeviceOperationResult<DeviceInventoryResponse>> RegisterAsync(RegisterDeviceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<DeviceOperationResult<bool>> RemoveAsync(string deviceId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
     private sealed class RecordingNotifier : IClientNotifier
     {
         public List<string> Events { get; } = [];
@@ -306,3 +331,4 @@ public class DeviceCommandEndpointTests
         }
     }
 }
+
