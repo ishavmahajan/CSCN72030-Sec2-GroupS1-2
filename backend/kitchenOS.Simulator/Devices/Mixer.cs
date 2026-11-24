@@ -97,6 +97,12 @@ public class Mixer : SimulatedDevice
 
     public override bool TrySetMode(string mode, string? component, out string? reason)
     {
+        if (string.Equals(mode, "broil", StringComparison.OrdinalIgnoreCase))
+        {
+            reason = "The broil mode is not supported by a mixer.";
+            return false;
+        }
+
         Mode = mode;
         reason = null;
         return true;

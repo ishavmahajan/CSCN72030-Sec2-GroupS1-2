@@ -7,6 +7,7 @@ using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Features.Devices;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Notifier;
+using kitchenOS_Scada.Api.Persistence;
 using kitchenOS_Scada.Api.Simulator.Devices;
 using kitchenOS_Scada.Api.Tests.Simulator;
 using kitchenOS_Scada.Contract.Events;
@@ -54,9 +55,13 @@ public class DeviceCommandEndpointTests
 
         WebApplicationBuilder builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Configuration["ConnectionStrings:Postgres"] =
+            "Host=localhost;Port=5432;Database=kitchenos_test;Username=kitchenos;Password=kitchenos_dev_password";
         builder.Services.AddSingleton<IMessageBus>(_bus);
         builder.Services.AddSingleton(_simulator);
         builder.Services.AddSingleton<IDeviceCommandService, DeviceCommandService>();
+        builder.Services.AddDeviceManagement();
+        builder.Services.AddKitchenOsPersistence(builder.Configuration);
         builder.Services.AddControllers()
             .AddApplicationPart(typeof(DevicesController).Assembly);
         _app = builder.Build();
