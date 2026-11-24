@@ -12,5 +12,7 @@ public static class MessageChannels
     public const string AlarmEvents = "kitchenos:events:alarms";
 
     public const string CommandResultEvents = "kitchenos:events:command-results";
+
+    public const string DeviceInventory = "kitchenos:device-inventory";
 }
 

@@ -1,5 +1,7 @@
-using kitchenOS.Simulator;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS_Scada.Api.Features.Devices.Contracts;
+using kitchenOS_Scada.Api.Features.Devices.Queries;
+using kitchenOS_Scada.Api.Features.Devices.Registration;
+using kitchenOS_Scada.Api.Features.Devices.Removal;
 using Microsoft.AspNetCore.Mvc;
 using StackExchange.Redis;
 
@@ -7,28 +9,82 @@ namespace kitchenOS_Scada.Api.Features.Devices;
 
 [ApiController]
 [Route("devices")]
-public sealed class DevicesController(
-    DeviceSimulator simulator,
-    IDeviceCommandService commandService,
-    ILogger<DevicesController> logger) : ControllerBase
+public sealed class DevicesController : ControllerBase
 {
-    /// <summary>Returns all simulated devices and their current points.</summary>
-    [HttpGet]
-    [ProducesResponseType<IReadOnlyList<DeviceResponse>>(StatusCodes.Status200OK)]
-    public ActionResult<IReadOnlyList<DeviceResponse>> GetDevices()
-    {
-        IReadOnlyList<DeviceResponse> devices = simulator.GetDevices()
-            .Select(DeviceDtoMappings.ToResponse)
-            .ToArray();
+    private readonly IDeviceQueryService _queryService;
+    private readonly IDeviceRegistrationService _registrationService;
+    private readonly IDeviceRemovalService _removalService;
+    private readonly IDeviceCommandService _commandService;
+    private readonly ILogger<DevicesController> _logger;
 
-        return Ok(devices);
+    public DevicesController(
+        IDeviceQueryService queryService,
+        IDeviceRegistrationService registrationService,
+        IDeviceRemovalService removalService,
+        IDeviceCommandService commandService,
+        ILogger<DevicesController> logger)
+    {
+        _queryService = queryService;
+        _registrationService = registrationService;
+        _removalService = removalService;
+        _commandService = commandService;
+        _logger = logger;
+    }
+
+    /// <summary>Returns all active devices in the persisted inventory.</summary>
+    [HttpGet]
+    [ProducesResponseType<IReadOnlyList<DeviceInventoryResponse>>(StatusCodes.Status200OK)]
+    public Task<ActionResult<IReadOnlyList<DeviceInventoryResponse>>> GetDevices(
+        CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>Returns one device from the persisted inventory.</summary>
+    [HttpGet("{deviceId}")]
+    [ProducesResponseType<DeviceInventoryResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public Task<ActionResult<DeviceInventoryResponse>> GetDevice(
+        string deviceId,
+        CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>Registers a device in the persisted inventory.</summary>
+    [HttpPost]
+    [ProducesResponseType<DeviceInventoryResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public Task<ActionResult<DeviceInventoryResponse>> RegisterDevice(
+        RegisterDeviceRequest request,
+        CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>Removes a device from the active persisted inventory.</summary>
+    [HttpDelete("{deviceId}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IActionResult> RemoveDevice(
+        string deviceId,
+        CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>Rejects command requests that do not specify a device ID.</summary>
     [HttpPost("commands")]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult SendCommandWithoutDeviceId() =>
-        BadRequest(new { error = "Device ID is required." });
+    public IActionResult SendCommandWithoutDeviceId()
+    {
+        return BadRequest(new { error = "Device ID is required." });
+    }
 
     /// <summary>Queues a command for a simulated device.</summary>
     [HttpPost("{deviceId}/commands")]
@@ -53,7 +109,7 @@ public sealed class DevicesController(
 
         try
         {
-            DeviceCommandSubmissionResult result = await commandService.SubmitAsync(
+            DeviceCommandSubmissionResult result = await _commandService.SubmitAsync(
                 deviceId,
                 request,
                 cancellationToken);
@@ -77,7 +133,7 @@ public sealed class DevicesController(
         }
         catch (Exception exception) when (exception is RedisException or TimeoutException)
         {
-            logger.LogError(exception, "Could not queue command for device {DeviceId}", deviceId);
+            _logger.LogError(exception, "Could not queue command for device {DeviceId}", deviceId);
             return Problem(
                 "The command bus is unavailable.",
                 statusCode: StatusCodes.Status503ServiceUnavailable);

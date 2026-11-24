@@ -16,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Register the MVC and OpenAPI services used by the HTTP API.
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
+builder.Services.AddDeviceManagement();
 builder.Services.AddKitchenOsPersistence(builder.Configuration);
 
 // Keep the simulator and command service in-process so API requests can use the
