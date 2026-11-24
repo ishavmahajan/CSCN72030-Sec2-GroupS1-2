@@ -1,93 +1,140 @@
-# API authentication and authorization
+# ASP.NET Core Identity
 
-KitchenOS validates access tokens issued by an external OpenID Connect provider.
-It does not issue passwords, tokens, or local user accounts. The team must select
-the provider and register the API before enabling this branch in a shared environment.
+KitchenOS stores local user accounts, password hashes and roles in PostgreSQL using
+ASP.NET Core Identity. No external login provider, JWT signing secret, public
+registration, or preset passwords are required. The browser signs in with an
+HTTP-only session cookie, including for `/ws`.
 
-## Configuration
+## First startup
 
-Set these values in the local `.env` used by Docker Compose:
+Keep the PostgreSQL values from the team's `.env`. Add these entries to that same
+local file at the repository root (beside `docker-compose.yml`):
 
 ```dotenv
-AUTH_AUTHORITY=https://your-provider.example/your-issuer
-AUTH_AUDIENCE=your-kitchenos-api-audience
-AUTH_ROLE_CLAIM_TYPE=roles
+IDENTITY_ADMIN_EMAIL=your-email@example.com
+IDENTITY_ADMIN_PASSWORD=choose-a-unique-strong-password
+FRONTEND_ORIGIN=http://localhost:3020
 ```
 
-Use the provider's actual issuer and access-token audience. For a host outside
-Docker, the equivalent ASP.NET Core settings are `Authentication__Authority`,
-`Authentication__Audience`, and `Authentication__RoleClaimType`.
-Missing issuer/audience configuration fails startup; there is no anonymous development bypass.
-Signing keys come from HTTPS OIDC discovery, with normal key rotation support.
-Issuer, audience, signature, expiration, and a nonempty `sub` are required.
-The API uses zero clock skew, so expired tokens are rejected immediately.
+Choose a real password of at least 12 characters with uppercase, lowercase, digit
+and non-alphanumeric characters. The example is a placeholder, not a working
+credential. Never commit `.env` or paste its contents into a PR.
 
-Create these exact role values in the provider and assign users explicitly:
-
-| Role | Monitoring and `/ws` | Commands and future alarm acknowledgement | Register/remove devices |
-| --- | --- | --- | --- |
-| Viewer | Yes | No | No |
-| Operator | Yes | Yes | No |
-| Administrator | Yes | Yes | Yes |
-
-The default role claim is `roles`; configure a different claim name if your provider
-uses one. Unknown/missing roles receive 403 even with a valid token.
-New endpoints default to the monitoring policy. New mutation endpoints must
-explicitly use `AuthorizationPolicies.Operate` or `AuthorizationPolicies.Administer`.
-Only `/health` is anonymous. Database readiness and development OpenAPI require a role.
-
-## HTTP and WebSocket clients
-
-Send an **access token intended for this API**, not an ID token:
-
-```http
-Authorization: Bearer <access-token>
+```powershell
+docker compose up -d --build
 ```
 
-Non-browser WebSocket clients can use the same header. Browser clients may use
-`wss://your-api/ws?access_token=<URL-encoded-access-token>` because the browser
-WebSocket constructor cannot set an Authorization header. URL tokens are accepted
-only on an actual `/ws` WebSocket upgrade, never on ordinary HTTP operations.
-Use HTTPS/WSS in deployed environments. Keep ASP.NET Core hosting logs at Warning
-(already configured), and redact query strings in reverse-proxy/access logs.
-Do not persist tokens in browser local storage or log them. Obtain/refresh tokens
-through the chosen provider's supported client or a backend-for-frontend.
-The current frontend has no login/token acquisition integration; that must be wired
-to the chosen provider before its existing anonymous calls can work with this API.
+Startup applies the Identity migration in its own `identity` schema, with a
+separate migration-history table. Existing device entities and migrations are
+unchanged. It creates the three roles and the initial administrator only when
+there is no administrator already. Startup never resets an existing account's
+password or promotes an existing user. Remove `IDENTITY_ADMIN_PASSWORD` and
+`IDENTITY_ADMIN_EMAIL` from `.env` after the first successful startup and recreate
+the backend container so those values are removed from its environment.
 
-Authentication is checked at the WebSocket handshake. Existing connections are not
-revalidated on every message; clients should reconnect with fresh credentials when
-their token expires. Server-enforced live-session revocation is outside this change.
+Open http://localhost:3020 and sign in. The dashboard sends cookies and CSRF tokens
+on API requests and uses the same session cookie for WebSockets. Viewers see
+monitoring information without command controls. Sign out closes the dashboard's
+socket and invalidates that user's existing cookies through the security stamp.
 
-## Identity and audit
+## Accounts and roles
 
-Controllers can read validated `User` claims, and scoped services can obtain them
-through `IHttpContextAccessor`. Mutation audit logs include the stable issuer and
-subject, request trace ID, method, path, and response status. No token, password,
-query string, or command argument body is logged. No schema or device/event contract
-changes are needed.
+| Role | Monitoring and WebSockets | Commands / future alarm acknowledgement | Register or remove devices | Create accounts |
+| --- | --- | --- | --- | --- |
+| Viewer | Yes | No | No | No |
+| Operator | Yes | Yes | No | No |
+| Administrator | Yes | Yes | Yes | Yes |
 
-## Scope and verification
+There is no public self-registration or account-creation form. To create another
+account, an administrator can run this in the signed-in dashboard's browser console
+(the password below is a placeholder; supply the new user's chosen password):
 
-The current inventory GET/register/remove implementations are placeholders, and no
-alarm acknowledgement HTTP endpoint exists yet. Their business implementation is
-owned by the device/alarm features. Authorization is attached to the existing device
-actions; the Operator policy is ready for the future acknowledgement endpoint.
+```javascript
+const csrf = await fetch('http://localhost:8080/auth/csrf', {
+  credentials: 'include'
+}).then(response => response.json());
+const result = await fetch('http://localhost:8080/auth/users', {
+  method: 'POST', credentials: 'include',
+  headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf.token },
+  body: JSON.stringify({
+    email: 'operator@example.com', password: '<new-user-password>', role: 'Operator'
+  })
+});
+console.log(result.status); // 201 when created
+```
 
-Run:
+`role` defaults to `Viewer` if omitted. Unsupported roles and weak passwords return
+400; unauthenticated requests return 401, and non-administrators receive 403.
+An account/role administration UI, password-recovery email and MFA UI are not part
+of this change. Do not enable account email confirmation until an email sender and
+confirmation flow are configured.
+
+## Endpoints
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/auth/csrf` | Obtain an identity-bound CSRF token and anti-forgery cookie |
+| POST | `/auth/login` | Sign in with `{ "email": "...", "password": "..." }`; returns 204 |
+| GET | `/auth/me` | Return the signed-in user's ID, email and roles |
+| POST | `/auth/logout` | Invalidate sessions and clear the cookie; returns 204 |
+| POST | `/auth/users` | Administrator creates an account with a supported role |
+
+All unsafe HTTP methods, including login/logout, require `X-CSRF-TOKEN` from
+`/auth/csrf` plus the matching cookie. Obtain a fresh token after changing identity.
+Session cookies are HTTP-only, SameSite Strict, and expire after 30 minutes without
+sliding renewal. Password failures lock the account after five attempts for 15
+minutes. The login endpoint also limits each remote IP to ten requests per minute.
+Cookies are revalidated against Identity's security stamp on every request.
+Monitoring sockets are cut off at the authentication ticket's expiry; stamp changes
+are checked on subsequent HTTP requests or new socket handshakes, not continuously
+inside an already-open socket.
+
+WebSockets accept cookies only, with no token query parameter. Handshakes reject
+missing, expired or invalid cookies. Browser origins must match the configured
+frontend origin or the API's own origin. HTTP CORS also allows only the configured
+frontend origin and credentials. `/health` remains anonymous; other unannotated
+endpoints require the monitoring policy.
+
+## Deployment
+
+HTTP cookies are permitted for local Development only. Outside Development, use
+HTTPS for the frontend and API and WSS for sockets; cookies require Secure.
+SameSite Strict requires frontend and API to be on the same site. Use one trusted
+reverse proxy/origin or same-site subdomains, rather than unrelated hosting domains.
+Set `Security__FrontendOrigin` to the actual UI origin. Configure trusted forwarded
+headers at the deployment boundary if TLS terminates at a reverse proxy.
+
+Docker persists Data Protection keys in the `identity-keys` volume. Retain that
+volume across restarts, share it between API instances if scaling, and protect it
+as credential material. Production needs appropriate disk/key encryption and
+restricted filesystem access. Losing the keys invalidates existing cookies.
+
+For non-Docker hosting, use `ConnectionStrings__Postgres`,
+`Identity__BootstrapAdministrator__Email`, `Identity__BootstrapAdministrator__Password`,
+`Security__FrontendOrigin` and `Security__KeyRingPath` through secure configuration.
+
+## Tests and feature boundaries
 
 ```powershell
 docker compose run --rm --no-deps --build backend dotnet test /app/kitchenOS_Scada.Api.Tests/kitchenOS_Scada.Api.Tests.csproj
 ```
 
-`Security/AuthorizationIntegrationTests` hosts the real controller routes with a
-resource filter that stops after authorization, so unfinished inventory actions do
-not require PostgreSQL. It tests HTTP 401/403, each permitted role, invalid issuer,
-audience/signature/expiry/subject, fallback protection, identity propagation, and real
-WebSocket handshakes. The alarm/telemetry test routes are policy fixtures, not new API
-features. Existing command tests now run with signed Operator tokens and the real
-authentication middleware, continuing to exercise publication and result delivery.
+Security tests use real Identity managers, EF Core SQLite stores, password hashing,
+antiforgery and session cookies, without requiring Redis/PostgreSQL. They exercise
+401/403, roles, login, password lockout, account creation, CSRF rejection, expired
+and tampered cookies, logout revocation and WebSocket handshakes. Existing command
+tests sign in as an Operator before exercising publication and result delivery.
+The production migration targets PostgreSQL and keeps Identity separate from the
+device persistence context.
+
+Inventory GET/register/remove business implementations in the current base branch
+are placeholders, and there is no alarm acknowledgement endpoint yet. Their owners
+must complete those business features. Authorization tests stop after route policy
+checks for those actions; fixture telemetry/acknowledgement routes test policies,
+not new business functionality. Apply `AuthorizationPolicies.Operate` when the alarm
+acknowledgement action lands. Mutation audit logs contain a stable user ID and
+request trace information, without passwords, cookies or command argument bodies.
 
 References:
-- https://learn.microsoft.com/aspnet/core/security/authentication/configure-jwt-bearer-authentication?view=aspnetcore-10.0
-- https://learn.microsoft.com/aspnet/core/signalr/authn-and-authz
+- https://learn.microsoft.com/aspnet/core/security/authentication/identity-api-authorization?view=aspnetcore-10.0
+- https://learn.microsoft.com/aspnet/core/security/anti-request-forgery?view=aspnetcore-10.0

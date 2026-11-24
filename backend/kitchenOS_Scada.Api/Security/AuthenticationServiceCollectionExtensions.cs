@@ -1,5 +1,10 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace kitchenOS_Scada.Api.Security;
 
@@ -8,75 +13,75 @@ public static class AuthenticationServiceCollectionExtensions
     public static IServiceCollection AddKitchenOsSecurity(
         this IServiceCollection services, IConfiguration configuration)
     {
-        IConfigurationSection section = configuration.GetSection("Authentication");
-        services.AddOptions<IdentityProviderOptions>().Bind(section)
-            .Validate(options => Uri.TryCreate(options.Authority, UriKind.Absolute, out Uri? uri)
-                && uri.Scheme == Uri.UriSchemeHttps && string.IsNullOrEmpty(uri.Query)
-                && string.IsNullOrEmpty(uri.Fragment),
-                "Authentication:Authority must be the identity provider's HTTPS issuer URL.")
-            .Validate(options => !string.IsNullOrWhiteSpace(options.Audience),
-                "Authentication:Audience must identify the KitchenOS API.")
-            .Validate(options => !string.IsNullOrWhiteSpace(options.RoleClaimType),
-                "Authentication:RoleClaimType must identify the provider's role claim.")
-            .ValidateOnStart();
+        string connection = configuration.GetConnectionString("Postgres")
+            ?? throw new InvalidOperationException("Connection string 'Postgres' is required for Identity.");
+        services.AddDbContext<IdentityDataContext>(options => options.UseNpgsql(connection,
+            postgres => postgres.MigrationsHistoryTable("__EFMigrationsHistory", "identity")));
+        services.AddIdentity<IdentityUser, IdentityRole>(options =>
+        {
+            options.User.RequireUniqueEmail = true;
+            options.Password.RequiredLength = 12;
+            options.Lockout.MaxFailedAccessAttempts = 5;
+            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            options.ClaimsIdentity.UserIdClaimType = "sub";
+        }).AddEntityFrameworkStores<IdentityDataContext>().AddDefaultTokenProviders();
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
-        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
-            .Configure<Microsoft.Extensions.Options.IOptions<IdentityProviderOptions>>((options, provider) =>
-            {
-                IdentityProviderOptions identity = provider.Value;
-                options.Authority = identity.Authority;
-                options.Audience = identity.Audience;
-                options.RequireHttpsMetadata = true;
-                options.MapInboundClaims = false;
-                options.IncludeErrorDetails = false;
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidateLifetime = true,
-                    RequireExpirationTime = true,
-                    RequireSignedTokens = true,
-                    ClockSkew = TimeSpan.Zero,
-                    NameClaimType = "sub",
-                    RoleClaimType = identity.RoleClaimType
-                };
-                options.Events = new JwtBearerEvents
-                {
-                    OnMessageReceived = context =>
-                    {
-                        // Browser WebSockets cannot supply Authorization headers.
-                        // Do not accept URL credentials on ordinary HTTP endpoints.
-                        if (!context.Request.Headers.ContainsKey("Authorization")
-                            && context.Request.Path.Equals(new PathString("/ws"))
-                            && context.HttpContext.WebSockets.IsWebSocketRequest
-                            && context.Request.Query.TryGetValue("access_token", out var token)
-                            && token.Count == 1)
-                        {
-                            context.Token = token[0];
-                        }
-                        return Task.CompletedTask;
-                    },
-                    OnTokenValidated = context =>
-                    {
-                        if (string.IsNullOrWhiteSpace(context.Principal?.FindFirst("sub")?.Value))
-                        {
-                            context.Fail("A stable subject is required.");
-                        }
-                        return Task.CompletedTask;
-                    }
-                };
-            });
+        services.ConfigureApplicationCookie(options =>
+        {
+            options.Cookie.Name = "KitchenOS.Session";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+            options.SlidingExpiration = false;
+            // API clients need status codes, including on the raw WebSocket route.
+            options.Events.OnRedirectToLogin = context => Status(context, StatusCodes.Status401Unauthorized);
+            options.Events.OnRedirectToAccessDenied = context => Status(context, StatusCodes.Status403Forbidden);
+        });
+        services.AddOptions<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme)
+            .Configure<IHostEnvironment>((options, environment) => options.Cookie.SecurePolicy =
+                environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always);
+        services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
+        services.AddAntiforgery(options =>
+        {
+            options.HeaderName = "X-CSRF-TOKEN";
+            options.Cookie.Name = "KitchenOS.Csrf";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+        });
+        services.AddOptions<Microsoft.AspNetCore.Antiforgery.AntiforgeryOptions>()
+            .Configure<IHostEnvironment>((options, environment) => options.Cookie.SecurePolicy =
+                environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always);
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("IdentityLogin", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions
+                { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+        });
         services.AddAuthorization(AuthorizationPolicies.Configure);
         services.AddHttpContextAccessor();
+        services.Configure<BootstrapAdministratorOptions>(configuration.GetSection("Identity:BootstrapAdministrator"));
+        services.Configure<KitchenOsSecurityOptions>(configuration.GetSection("Security"));
+        services.AddDataProtection().SetApplicationName("KitchenOS")
+            .PersistKeysToFileSystem(new DirectoryInfo(configuration["Security:KeyRingPath"]
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KitchenOS", "keys")));
         return services;
+    }
+
+    private static Task Status(RedirectContext<CookieAuthenticationOptions> context, int statusCode)
+    {
+        context.Response.StatusCode = statusCode;
+        return Task.CompletedTask;
     }
 }
 
-public sealed class IdentityProviderOptions
+public sealed class KitchenOsSecurityOptions
 {
-    public string Authority { get; set; } = "";
-    public string Audience { get; set; } = "";
-    public string RoleClaimType { get; set; } = "roles";
+    public string FrontendOrigin { get; set; } = "http://localhost:3020";
+}
+
+public sealed class BootstrapAdministratorOptions
+{
+    public string? Email { get; set; }
+    public string? Password { get; set; }
 }

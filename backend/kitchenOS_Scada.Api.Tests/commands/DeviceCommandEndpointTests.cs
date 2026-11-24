@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using kitchenOS_Scada.Api.Tests.Security;
 using kitchenOS_Scada.Api.Security;
 using kitchenOS_Scada.Api.Features.Devices.Contracts;
@@ -60,7 +59,7 @@ public class DeviceCommandEndpointTests
             """,
             _bus);
 
-        WebApplicationBuilder builder = WebApplication.CreateBuilder();
+        WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         _identity.Configure(builder.Services);
         UnusedInventoryServices inventory = new();
@@ -73,11 +72,13 @@ public class DeviceCommandEndpointTests
         builder.Services.AddControllers()
             .AddApplicationPart(typeof(DevicesController).Assembly);
         _app = builder.Build();
+        await _identity.InitializeAsync(_app.Services);
         _app.UseKitchenOsSecurity();
+        _app.MapKitchenOsIdentity();
         _app.MapControllers();
         await _app.StartAsync();
         _client = new HttpClient { BaseAddress = new Uri(_app.Urls.Single()) };
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _identity.Token());
+        await _identity.LoginAsync(_client);
     }
 
     [TestCleanup]

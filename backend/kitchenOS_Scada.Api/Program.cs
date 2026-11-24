@@ -32,9 +32,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3020")
+        policy.WithOrigins(builder.Configuration["Security:FrontendOrigin"] ?? "http://localhost:3020")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -62,6 +63,7 @@ builder.Services.AddHostedService<MessageBusService>();
 
 
 var app = builder.Build();
+await app.InitializeKitchenOsIdentityAsync();
 
 // Apply pending EF Core migrations before the API begins accepting requests.
 // This keeps the database schema synchronized with the deployed application.
@@ -94,6 +96,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.MapKitchenOsIdentity();
 app.MapControllers();
 
 // Provide a lightweight liveness endpoint for local orchestration and probes.

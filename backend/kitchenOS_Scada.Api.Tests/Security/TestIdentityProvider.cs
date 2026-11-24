@@ -1,55 +1,80 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
+using System.Net;
+using System.Net.Http.Json;
 using kitchenOS_Scada.Api.Security;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.IdentityModel.Protocols;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace kitchenOS_Scada.Api.Tests.Security;
 
-// Generated test keys never leave the test process. Production still uses OIDC discovery.
+// Uses the real Identity managers, EF store, password hasher, and cookie handler.
 internal sealed class TestIdentityProvider : IDisposable
 {
-    private readonly RSA _rsa = RSA.Create(2048);
-    private readonly RsaSecurityKey _key;
-    public const string Issuer = "https://identity.kitchenos.test";
-    public const string Audience = "kitchenos-test-api";
-
-    public TestIdentityProvider() => _key = new RsaSecurityKey(_rsa) { KeyId = "test-key" };
+    public const string Password = "KitchenOS_Test_42!";
+    private readonly SqliteConnection _database = new("Data Source=:memory:");
+    public TestClock Clock { get; } = new();
 
     public void Configure(IServiceCollection services)
     {
+        _database.Open();
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(
-            new Dictionary<string, string?>
-            {
-                ["Authentication:Authority"] = Issuer,
-                ["Authentication:Audience"] = Audience
-            }).Build();
+            new Dictionary<string, string?> { ["ConnectionStrings:Postgres"] = "Host=unused;Database=unused" }).Build();
         services.AddKitchenOsSecurity(configuration);
-        services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
-        {
-            OpenIdConnectConfiguration metadata = new() { Issuer = Issuer };
-            metadata.SigningKeys.Add(new RsaSecurityKey(_rsa.ExportParameters(false)) { KeyId = _key.KeyId });
-            options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(metadata);
-        });
+        services.RemoveAll<DbContextOptions<IdentityDataContext>>();
+        services.RemoveAll<Microsoft.EntityFrameworkCore.Infrastructure.IDbContextOptionsConfiguration<IdentityDataContext>>();
+        services.AddDbContext<IdentityDataContext>(options => options.UseSqlite(_database));
+        services.AddDataProtection().UseEphemeralDataProtectionProvider();
+        services.PostConfigure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme,
+            options => options.TimeProvider = Clock);
     }
 
-    public string Token(string? role = DeviceRoles.Operator, bool expired = false,
-        string issuer = Issuer, string audience = Audience, bool includeSubject = true)
+    public async Task InitializeAsync(IServiceProvider services)
     {
-        List<Claim> claims = [];
-        if (includeSubject) claims.Add(new Claim("sub", "test-operator-01"));
-        if (role is not null) claims.Add(new Claim("roles", role));
-        DateTime now = DateTime.UtcNow;
-        JwtSecurityToken token = new(issuer, audience, claims,
-            now.AddMinutes(-10), expired ? now.AddMinutes(-1) : now.AddMinutes(5),
-            new SigningCredentials(_key, SecurityAlgorithms.RsaSha256));
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        using IServiceScope scope = services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IdentityDataContext>().Database.EnsureCreatedAsync();
+        await IdentityInitializationExtensions.InitializeAccountsAsync(scope.ServiceProvider);
+        UserManager<IdentityUser> users = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+        foreach (string role in new[] { DeviceRoles.Viewer, DeviceRoles.Operator, DeviceRoles.Administrator, "NoRole" })
+        {
+            IdentityUser user = new() { UserName = Email(role), Email = Email(role) };
+            Ensure(await users.CreateAsync(user, Password));
+            if (role != "NoRole") Ensure(await users.AddToRoleAsync(user, role));
+        }
     }
 
-    public void Dispose() => _rsa.Dispose();
+    public static string Email(string role) => role.ToLowerInvariant() + "@kitchenos.test";
+
+    public async Task LoginAsync(HttpClient client, string role = DeviceRoles.Operator)
+    {
+        await RefreshCsrfAsync(client);
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/auth/login", new { email = Email(role), password = Password });
+        if (response.StatusCode != HttpStatusCode.NoContent)
+            throw new InvalidOperationException("Test login failed: " + await response.Content.ReadAsStringAsync());
+        await RefreshCsrfAsync(client);
+    }
+
+    public static async Task RefreshCsrfAsync(HttpClient client)
+    {
+        Dictionary<string, string>? csrf = await client.GetFromJsonAsync<Dictionary<string, string>>("/auth/csrf");
+        client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+        client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", csrf!["token"]);
+    }
+
+    public void Dispose() => _database.Dispose();
+    private static void Ensure(IdentityResult result)
+    {
+        if (!result.Succeeded) throw new InvalidOperationException(string.Join(",", result.Errors.Select(error => error.Code)));
+    }
+
+    internal sealed class TestClock : TimeProvider
+    {
+        private TimeSpan _offset;
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.UtcNow + _offset;
+        public void Advance(TimeSpan time) => _offset += time;
+    }
 }
