@@ -37,6 +37,7 @@ services:
 
     volumes:
       - ./backend:/app
+      - identity-keys:/var/lib/kitchenos/keys
 
     ports:
       - "8080:8080"
@@ -52,6 +53,10 @@ services:
       ASPNETCORE_URLS: http://+:8080
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
       DOTNET_WATCH_RESTART_ON_RUDE_EDIT: "1"
+      Identity__BootstrapAdministrator__Email: ${IDENTITY_ADMIN_EMAIL:-}
+      Identity__BootstrapAdministrator__Password: ${IDENTITY_ADMIN_PASSWORD:-}
+      Security__KeyRingPath: /var/lib/kitchenos/keys
+      Security__FrontendOrigin: ${FRONTEND_ORIGIN:-http://localhost:3020}
       ConnectionStrings__Redis: redis:6379
       ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
 
@@ -111,3 +116,5 @@ services:
 
 volumes:
   postgres-data:
+  identity-keys:
+

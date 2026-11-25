@@ -9,6 +9,7 @@ using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Features.Devices;
 using kitchenOS_Scada.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
+using kitchenOS_Scada.Api.Security;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Register the MVC and OpenAPI services used by the HTTP API.
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
+builder.Services.AddKitchenOsSecurity(builder.Configuration);
 builder.Services.AddDeviceManagement();
 builder.Services.AddKitchenOsPersistence(builder.Configuration);
 
@@ -30,9 +32,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3020")
+        policy.WithOrigins(builder.Configuration["Security:FrontendOrigin"] ?? "http://localhost:3020")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -60,6 +63,7 @@ builder.Services.AddHostedService<MessageBusService>();
 
 
 var app = builder.Build();
+await app.InitializeKitchenOsIdentityAsync();
 
 // Apply pending EF Core migrations before the API begins accepting requests.
 // This keeps the database schema synchronized with the deployed application.
@@ -84,6 +88,7 @@ simulator.LoadAlarms(alarmsJson);
 app.UseWebSockets();
 app.UseCors("Frontend");
 app.UseHttpsRedirection();
+app.UseKitchenOsSecurity();
 
 if (app.Environment.IsDevelopment())
 {
@@ -91,6 +96,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.MapKitchenOsIdentity();
 app.MapControllers();
 
 // Provide a lightweight liveness endpoint for local orchestration and probes.
@@ -98,7 +104,7 @@ app.MapGet("/health", () =>
 {
     return Results.Ok(new { status = "Healthy" });
 })
-.WithName("GetHealth");
+.WithName("GetHealth").AllowAnonymous();
 
 // Keep database readiness separate from process liveness so orchestration can
 // distinguish an unavailable dependency from a stopped API process.
@@ -163,6 +169,7 @@ app.Map("/ws", async (HttpContext context, WebSocketClientNotifier notifier) =>
     {
         notifier.RemoveClient(clientId);
     }
-}).WithName("WebSocketEndpoint");
+}).WithName("WebSocketEndpoint").RequireAuthorization(AuthorizationPolicies.Monitor);
 app.Run();
+
 

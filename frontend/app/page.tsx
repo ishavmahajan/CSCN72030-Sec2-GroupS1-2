@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Activity, AlertTriangle, Bell, CalendarDays, ChevronDown, ChevronRight, ClipboardList, Clock3, Fan, Gauge, Layers3, LayoutGrid, Menu, Power, Settings, Snowflake, Square, Utensils, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
 import { DeviceCommandControls, type DevicePoint } from '../components/device-command-controls'
 import { CommandToasts } from '../components/command-toasts'
+import { useSession } from '../components/auth-gate'
+import { sessionFetch } from '../lib/auth-api'
 import { capabilityProvider, type CommandRequest, type DeviceProfile } from '../lib/device-capabilities'
 import { useDeviceCommands, type CommandResult } from '../lib/use-device-commands'
 
@@ -231,6 +233,8 @@ function DetailPanel({ device, connected, children }: { device: Device; connecte
 }
 
 export default function Page() {
+  const { user, logout } = useSession()
+  const canOperate = user.roles.some((role) => role === 'Operator' || role === 'Administrator')
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [profiles, setProfiles] = useState<readonly DeviceProfile[]>([])
@@ -260,7 +264,7 @@ export default function Page() {
     const socketUrl = apiUrl.replace(/^http/, 'ws') + '/ws'
     const socket = new WebSocket(socketUrl)
 
-    fetch(`${apiUrl}/devices`)
+    sessionFetch('/devices')
       .then((response) => {
         if (!response.ok) throw new Error(`Device request failed: ${response.status}`)
         return response.json() as Promise<ApiDevice[]>
@@ -274,7 +278,12 @@ export default function Page() {
       .catch((error) => console.error('Could not load devices', error))
 
     socket.onopen = () => setConnected(true)
-    socket.onclose = () => setConnected(false)
+    socket.onclose = () => {
+      setConnected(false)
+      if (!disposed) void sessionFetch('/auth/me').then((response) => {
+        if (response.status === 401) window.dispatchEvent(new Event('kitchenos:session-expired'))
+      }).catch(() => { /* An unavailable API is handled by the connection banner. */ })
+    }
     socket.onerror = () => setConnected(false)
     socket.onmessage = (event) => {
       try {
@@ -332,7 +341,7 @@ export default function Page() {
   const online = connected ? devices.length : 0
   const today = new Intl.DateTimeFormat('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date())
 
-  if (!selected) return <main className="app-shell"><section className="main-area"><div className="page-content"><p>Loading kitchen devices…</p></div></section></main>
+  if (!selected) return <main className="app-shell"><section className="main-area"><div className="page-content"><p>Waiting for device inventory. Your session is active.</p><button onClick={() => void logout()}>Sign out</button></div></section></main>
 
   const navItems = [{ label: 'Overview', icon: LayoutGrid }, { label: 'Equipment', icon: ClipboardList }, { label: 'Alarms', icon: Bell }, { label: 'Trends', icon: Activity }, { label: 'Events', icon: ClipboardList }, { label: 'Settings', icon: Settings }]
   const profile = profiles.find((item) => item.deviceType === selected.deviceType)
@@ -350,7 +359,7 @@ export default function Page() {
         <div className="top-brand"><img src="/kitchenos-logo.svg" alt="KitchenOS" /></div>
         <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>{connected ? <Wifi size={17} /> : <WifiOff size={17} />}<span>{connected ? 'Connected' : 'Disconnected'}</span></div>
         <div className="system-normal"><i /> {connected ? 'Monitoring active' : 'Status unavailable'}</div>
-        <div className="top-meta"><span><CalendarDays size={20} /> {today}</span><span><Clock3 size={20} /> Live</span><span className="operator"><Power size={19} /> Operator <ChevronDown size={17} /></span></div>
+        <div className="top-meta"><span><CalendarDays size={20} /> {today}</span><span><Clock3 size={20} /> Live</span><span className="operator"><Power size={19} /> {user.roles.join(", ")} <ChevronDown size={17} /></span><button onClick={() => void logout()}>Sign out</button></div>
       </header>
       <div className="page-content">
         {!connected && <section className="connection-banner" role="status"><WifiOff size={20} /><div><strong>Live connection unavailable</strong><span>Equipment values may be stale. Controls are disabled until the connection returns.</span></div></section>}
@@ -363,7 +372,7 @@ export default function Page() {
         <div className="dashboard-grid">
           <section id="equipment" className="equipment-section"><div className="section-title"><div><h1><LayoutGrid size={22} /> Equipment Overview</h1><p>Normal equipment is quiet; exceptions appear prominently.</p></div><span className={`live-label ${connected ? '' : 'offline'}`}>{connected ? 'Live' : 'Offline'}</span></div><div className="devices-grid">{devices.map((device) => <DeviceCard key={device.id} device={device} selected={device.id === selectedId} running={isRunning(device)} connected={connected} onSelect={() => setSelectedId(device.id)} />)}</div></section>
           <DetailPanel device={selected} connected={connected}>
-            {capabilityStatus === 'ready'
+            {!canOperate ? <p className="command-feedback">Viewer access — monitoring only.</p> : capabilityStatus === 'ready'
               ? <DeviceCommandControls key={selected.id} profile={profile} points={selected.points} deviceName={selected.name} running={isRunning(selected)}
                   disabled={!connected || pendingDevices.has(selected.id)} onSubmit={(request) => void submit(selected.id, selected.name, request)} />
               : <p className="command-feedback" role="status">{capabilityStatus === 'loading' ? 'Loading equipment controls…' : 'Equipment controls could not be loaded.'}</p>}
@@ -393,3 +402,4 @@ export default function Page() {
     <CommandToasts toasts={toasts} onDismiss={dismissToast} />
   </main>
 }
+

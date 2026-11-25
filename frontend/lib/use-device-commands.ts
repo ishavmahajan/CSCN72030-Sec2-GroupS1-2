@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CommandRequest } from './device-capabilities'
+import { sessionFetch } from './auth-api'
 
 export type CommandResult = { commandId: string; status: string; reason?: string }
 export type CommandToast = { id: number; deviceName: string; kind: 'pending' | 'success' | 'error'; text: string }
@@ -88,7 +89,7 @@ export function useDeviceCommands(apiUrl: string, onAcknowledged: (deviceId: str
     setPendingDevices((current) => new Set([...current, deviceId]))
 
     try {
-      const response = await fetch(`${apiUrl}/devices/${encodeURIComponent(deviceId)}/commands`, {
+      const response = await sessionFetch(`/devices/${encodeURIComponent(deviceId)}/commands`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -113,3 +114,4 @@ export function useDeviceCommands(apiUrl: string, onAcknowledged: (deviceId: str
 
   return { pendingDevices, toasts, dismissToast, receiveResult, submit }
 }
+
