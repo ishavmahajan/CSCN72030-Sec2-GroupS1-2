@@ -37,10 +37,23 @@ public sealed class DevicesController : ControllerBase
     /// <summary>Returns all active devices in the persisted inventory.</summary>
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<DeviceInventoryResponse>>(StatusCodes.Status200OK)]
-    public Task<ActionResult<IReadOnlyList<DeviceInventoryResponse>>> GetDevices(
+    public async Task<ActionResult<IReadOnlyList<DeviceInventoryResponse>>> GetDevices(
         CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        try
+        {
+            IReadOnlyList<DeviceInventoryResponse> devices =
+                await _queryService.GetActiveAsync(cancellationToken);
+
+            return Ok(devices);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(exception, "Error retrieving active devices");
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new { error = "An error occurred while retrieving active devices." });
+        }
     }
 
     /// <summary>Returns one device from the persisted inventory.</summary>

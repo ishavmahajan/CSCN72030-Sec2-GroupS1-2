@@ -1,4 +1,5 @@
 using kitchenOS_Scada.Api.Persistence.Entities;
+using kitchenOS_Scada.Api.Persistence.Seed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -46,5 +47,7 @@ internal sealed class DeviceEntityConfiguration : IEntityTypeConfiguration<Devic
 
         builder.HasIndex(device => device.DeviceName);
         builder.HasIndex(device => new { device.DeviceTypeId, device.IsActive });
+
+        builder.HasData(DeviceSeed.Data);
     }
 }

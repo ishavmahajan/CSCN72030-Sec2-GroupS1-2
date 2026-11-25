@@ -1,15 +1,14 @@
 using System.Net.WebSockets;
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
-using kitchenOS_Scada.Api.Simulator;
 using kitchenOS_Scada.Api.Notifier;
 using StackExchange.Redis;
 using kitchenOS_Scada.Api.Helpers;
-using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Features.Devices;
 using kitchenOS_Scada.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 using kitchenOS_Scada.Api.Security;
+
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,10 +20,8 @@ builder.Services.AddKitchenOsSecurity(builder.Configuration);
 builder.Services.AddDeviceManagement();
 builder.Services.AddKitchenOsPersistence(builder.Configuration);
 
-// Keep the simulator and command service in-process so API requests can use the
-// same device state that produces telemetry for connected clients.
-builder.Services.AddSingleton<DeviceSimulator>();
-builder.Services.AddSingleton<IDeviceCommandService, DeviceCommandService>();
+// Queue commands for the separately hosted simulator through the message bus.
+builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 
 // Allow the local frontend to call the API while keeping the policy scoped to
 // the known development origin.
@@ -75,14 +72,7 @@ using (IServiceScope scope = app.Services.CreateScope())
     await dbContext.Database.MigrateAsync();
 }
 
-// Load the initial simulation before serving requests so device endpoints have
-// a complete, consistent view of the simulated devices.
-var simulator = app.Services.GetRequiredService<DeviceSimulator>();
-string devicesJson = FileHelper.GetSimulationData("devices.json");
-string simulationJson = FileHelper.GetSimulationData("simulation.json");
-string alarmsJson = FileHelper.GetSimulationData("alarm.json");
-simulator.Load(devicesJson, simulationJson, app.Services.GetRequiredService<IMessageBus>());
-simulator.LoadAlarms(alarmsJson);
+await app.Services.LoadDeviceToSimulator();
 
 // Configure middleware before mapping HTTP and WebSocket endpoints.
 app.UseWebSockets();

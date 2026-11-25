@@ -1,7 +1,7 @@
 using System.Text.Json;
 using kitchenOS_Scada.Contract.Enums;
 
-namespace kitchenOS_Scada.Api.Simulator.Devices;
+namespace kitchenOS.Simulator.Devices;
 
 // Simulates oven temperature, timing, power, door, and operating mode points.
 public class Oven : SimulatedDevice

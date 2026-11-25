@@ -29,7 +29,13 @@ type Device = {
   acknowledgedRunning?: boolean
 }
 
-type ApiDevice = { deviceId: string; deviceName: string; deviceType: string; description: string; readPoints: DevicePoint[] }
+type ApiDevice = {
+  deviceId: string
+  deviceName: string
+  deviceType: string
+  description: string
+  readPoints?: DevicePoint[]
+}
 type AlarmEvent = { id: string; deviceId: string; deviceType: string; code: string; severity: string; text: string; timestamp: string }
 type DeviceEvent = {
   eventName: string
@@ -101,12 +107,13 @@ function isRunning(device: Device): boolean | undefined {
 function createDevice(device: ApiDevice): Device {
   const configuredDeviceType = getConfiguredDeviceType(device.deviceType)
   const metadata = deviceMetadata[configuredDeviceType] ?? { icon: Activity, color: 'blue', type: device.deviceType }
-  const reading = findPoint(device.readPoints, 'temperature') ?? findPoint(device.readPoints, 'speed', 'fanSpeed', 'flow', 'airflow', 'waterLevel', 'heating', 'motor', 'compressor', 'cycle', 'valve')
-  const power = findPoint(device.readPoints, 'power')
-  const energy = findPoint(device.readPoints, 'energy')
-  const setpoint = findPoint(device.readPoints, 'setpoint')
-  const door = findPoint(device.readPoints, 'door')
-  const mode = findPoint(device.readPoints, 'mode', 'powerState')
+  const points = device.readPoints ?? []
+  const reading = findPoint(points, 'temperature') ?? findPoint(points, 'speed', 'fanSpeed', 'flow', 'airflow', 'waterLevel', 'heating', 'motor', 'compressor', 'cycle', 'valve')
+  const power = findPoint(points, 'power')
+  const energy = findPoint(points, 'energy')
+  const setpoint = findPoint(points, 'setpoint')
+  const door = findPoint(points, 'door')
+  const mode = findPoint(points, 'mode', 'powerState')
   return {
     id: device.deviceId,
     deviceType: configuredDeviceType,
@@ -119,7 +126,7 @@ function createDevice(device: ApiDevice): Device {
     icon: metadata.icon,
     color: metadata.color,
     mode: displayValue(mode?.value),
-    points: device.readPoints,
+    points,
     power: power ? `${displayValue(power.value)} ${power.unit ?? ''}`.trim() : '—',
     energy: energy ? `${displayValue(energy.value)} ${energy.unit ?? ''}`.trim() : '—',
     setpoint: typeof setpoint?.value === 'number' ? setpoint.value : undefined,

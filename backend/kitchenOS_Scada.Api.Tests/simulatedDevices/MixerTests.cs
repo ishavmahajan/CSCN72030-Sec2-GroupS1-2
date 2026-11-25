@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using kitchenOS_Scada.Contract.Enums;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Tests;
 

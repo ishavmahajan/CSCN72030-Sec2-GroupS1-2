@@ -1,5 +1,6 @@
 using kitchenOS_Scada.Api.Features.Devices.Contracts;
 using kitchenOS_Scada.Api.Persistence.Repositories;
+using kitchenOS_Scada.Api.Persistence.Entities;
 
 namespace kitchenOS_Scada.Api.Features.Devices.Queries;
 
@@ -7,10 +8,20 @@ public sealed class DeviceQueryService(IDeviceRepository repository) : IDeviceQu
 {
     private readonly IDeviceRepository _repository = repository;
 
-    public Task<IReadOnlyList<DeviceInventoryResponse>> GetActiveAsync(
+    public async Task<IReadOnlyList<DeviceInventoryResponse>> GetActiveAsync(
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        IReadOnlyList<DeviceEntity> devices = await _repository.GetActiveAsync(cancellationToken);
+
+        return devices.Select(d => new DeviceInventoryResponse(
+            d.DeviceId,
+            d.DeviceName,
+            d.DeviceTypeId,
+            d.DeviceType.Name,
+            d.Description,
+            d.IsActive,
+            d.CreatedAtUtc,
+            d.UpdatedAtUtc)).ToList();
     }
 
     public Task<DeviceInventoryResponse?> GetByIdAsync(

@@ -1,6 +1,6 @@
 using System.Text.Json;
-using kitchenOS_Scada.Api.Simulator.Devices;
 using kitchenOS_Scada.Contract.Messaging;
+
 
 namespace kitchenOS_Scada.Api.Features.Devices;
 
@@ -37,22 +37,6 @@ public sealed record QueuedDeviceCommandResponse(
 
 internal static class DeviceDtoMappings
 {
-    public static DeviceResponse ToResponse(SimulatedDevice device)
-    {
-        return new DeviceResponse(
-            device.DeviceId,
-            device.DeviceName,
-            device.Description,
-            device.DeviceType.ToString(),
-            device.ReadPoints()
-                .Select(point => new DevicePointResponse(
-                    point.Name,
-                    point.Value,
-                    point.Unit,
-                    point.Component))
-                .ToArray());
-    }
-
     public static CommandArguments CloneArguments(CommandArguments arguments)
     {
         return new CommandArguments

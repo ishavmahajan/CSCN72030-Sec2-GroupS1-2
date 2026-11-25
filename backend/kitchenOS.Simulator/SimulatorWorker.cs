@@ -29,11 +29,7 @@ internal sealed class SimulatorWorker(
 
         try
         {
-            using var alarmTimer = new PeriodicTimer(TimeSpan.FromSeconds(20));
-            while (await alarmTimer.WaitForNextTickAsync(stoppingToken))
-            {
-                await simulator.PublishAlarms(stoppingToken);
-            }
+            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -41,7 +37,7 @@ internal sealed class SimulatorWorker(
         }
         finally
         {
-            simulator.Stop();
+            await simulator.StopAsync();
         }
     }
 }

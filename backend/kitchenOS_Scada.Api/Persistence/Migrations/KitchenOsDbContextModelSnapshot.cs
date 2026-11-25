@@ -122,6 +122,118 @@ namespace kitchenOS_Scada.Api.Persistence.Migrations
                     b.HasIndex("DeviceTypeId", "IsActive");
 
                     b.ToTable("devices", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            DeviceId = "FRZ-001",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Primary walk-in freezer for storing frozen ingredients at -18°C.",
+                            DeviceName = "Walk-In-Freezer-1",
+                            DeviceTypeId = 1,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "FRZ-002",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Backup walk-in freezer for additional frozen storage at -18°C.",
+                            DeviceName = "Walk-In-Freezer-2",
+                            DeviceTypeId = 1,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "OVN-001",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Primary commercial oven for daily baking and roasting.",
+                            DeviceName = "Oven-1",
+                            DeviceTypeId = 3,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "OVN-002",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Backup commercial oven for additional baking capacity.",
+                            DeviceName = "Oven-2",
+                            DeviceTypeId = 3,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "MIX-001",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Primary commercial mixer for daily food preparation.",
+                            DeviceName = "Mixer-1",
+                            DeviceTypeId = 4,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "MIX-002",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Backup commercial mixer for additional food preparation.",
+                            DeviceName = "Mixer-2",
+                            DeviceTypeId = 4,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "FAN-001",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Primary exhaust fan for removing smoke, heat, and cooking odors.",
+                            DeviceName = "Exhaust-Fan-1",
+                            DeviceTypeId = 5,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "FAN-002",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Secondary exhaust fan for supplementary kitchen ventilation.",
+                            DeviceName = "Exhaust-Fan-2",
+                            DeviceTypeId = 5,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "BLD-001",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Primary commercial blender for sauces, soups, and food preparation.",
+                            DeviceName = "Blender-1",
+                            DeviceTypeId = 6,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "DSH-001",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Primary commercial dishwasher for cleaning and sanitizing kitchen utensils.",
+                            DeviceName = "Dishwasher-1",
+                            DeviceTypeId = 7,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            DeviceId = "SNK-001",
+                            CreatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Description = "Main kitchen sink for handwashing and equipment cleaning.",
+                            DeviceName = "Sink-1",
+                            DeviceTypeId = 8,
+                            IsActive = true,
+                            UpdatedAtUtc = new DateTimeOffset(new DateTime(2026, 11, 25, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
                 });
 
             modelBuilder.Entity("kitchenOS_Scada.Api.Persistence.Entities.DeviceTypeEntity", b =>

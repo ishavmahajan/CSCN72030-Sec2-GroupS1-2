@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\kitchenOS_Scada.Contract\kitchenOS_Scada.Contract.csproj" />
-    <ProjectReference Include="..\kitchenOS.Simulator\kitchenOS.Simulator.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">

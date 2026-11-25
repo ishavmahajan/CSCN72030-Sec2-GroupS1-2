@@ -1,4 +1,5 @@
 using kitchenOS_Scada.Api.Persistence.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace kitchenOS_Scada.Api.Persistence.Repositories;
 
@@ -6,24 +7,34 @@ public sealed class DeviceRepository(KitchenOsDbContext dbContext) : IDeviceRepo
 {
     private readonly KitchenOsDbContext _dbContext = dbContext;
 
-    public Task<IReadOnlyList<DeviceEntity>> GetActiveAsync(
+    public async Task<IReadOnlyList<DeviceEntity>> GetActiveAsync(
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return await _dbContext.Devices
+            .Include(d => d.DeviceType)
+            .Where(d => d.IsActive)
+            .ToListAsync(cancellationToken);
     }
 
-    public Task<DeviceEntity?> GetByIdAsync(
+    public async Task<DeviceEntity?> GetByIdAsync(
         string deviceId,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return await _dbContext.Devices
+            .Include(device => device.DeviceType)
+            .SingleOrDefaultAsync(
+                device => device.DeviceId == deviceId && device.IsActive,
+                cancellationToken);
     }
 
-    public Task<bool> ExistsAsync(
+    public async Task<bool> ExistsAsync(
         string deviceId,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return await _dbContext.Devices
+            .AnyAsync(
+                device => device.DeviceId == deviceId && device.IsActive,
+                cancellationToken);
     }
 
     public Task AddAsync(

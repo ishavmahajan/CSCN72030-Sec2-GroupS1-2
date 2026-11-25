@@ -3,13 +3,19 @@ using kitchenOS_Scada.Contract.Enums;
 using kitchenOS_Scada.Contract.Events;
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
 using kitchenOS_Scada.Contract.Messaging;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS.Simulator.Devices;
+
 
 namespace kitchenOS.Simulator;
 
 public class DeviceSimulator : IDeviceSimulator
 {
+    private static readonly TimeSpan AlarmInterval = TimeSpan.FromSeconds(20);
     private readonly List<SimulatedDevice> _devices = [];
+    private readonly Dictionary<string, CancellationTokenSource> _deviceStops = [];
+    private readonly Dictionary<string, Task> _deviceTasks = [];
+    private readonly Dictionary<string, Task> _alarmTasks = [];
+    private readonly object _deviceLock = new();
     private Dictionary<string, DeviceAlarm[]> _alarms = new(StringComparer.OrdinalIgnoreCase);
     private readonly Random _random;
     private IMessageBus? _messageBus;
@@ -24,35 +30,37 @@ public class DeviceSimulator : IDeviceSimulator
 
     public void Load(string devicesString, string simulationString, IMessageBus messageBus)
     {
-        _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
-        _devices.Clear();
-
-        using var parsedDevices = JsonDocument.Parse(devicesString);
-        JsonElement parsedDevicesRoot = parsedDevices.RootElement;
-
         var parsedSimulation = JsonDocument.Parse(simulationString);
         JsonElement parsedSimulationRoot = parsedSimulation.RootElement;
+        _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
+        // _devices.Clear();
 
-        foreach (JsonElement item in parsedDevicesRoot.EnumerateArray())
+        //listen for device inventory messages  on the message bus
+        _messageBus.Subscribe(MessageChannels.DeviceInventory, async (List<DeviceInventoryDefinition> devices, CancellationToken cancellationToken) =>
         {
-            string deviceType = item.GetProperty("deviceType").GetString() ?? "";
-            JsonElement dummyData = parsedSimulationRoot.GetProperty(deviceType);
-            SimulatedDevice device = SimulatedDevice.Create(deviceType, dummyData);
-            string deviceName = item.GetProperty("deviceName").GetString() ?? "";
-            string description = item.TryGetProperty("description", out JsonElement descriptionProperty)
-                ? descriptionProperty.GetString() ?? ""
-                : "";
-            string deviceId = item.TryGetProperty("deviceId", out JsonElement deviceIdProperty)
-                ? deviceIdProperty.GetString() ?? Guid.NewGuid().ToString()
-                : Guid.NewGuid().ToString();
+            await StopAllDeviceSimulationsAsync();
+            lock (_deviceLock)
+            {
+                _devices.Clear();
+            }
 
-            device.setDeviceName(deviceName)
-                .setDescription(description)
-                .setJson(dummyData.Clone())
-                .setDeviceId(deviceId);
-            // device.Description = item.GetProperty("description").GetString() ?? "No description available";
-            _devices.Add(device);
-        }
+            foreach (DeviceInventoryDefinition definition in devices)
+            { 
+                string deviceType = definition.DeviceType.ToFriendlyString();
+                JsonElement dummyData = parsedSimulationRoot.GetProperty(deviceType);
+                SimulatedDevice device = SimulatedDevice.Create(deviceType, dummyData.Clone());
+                device.setDeviceId(definition.DeviceId);
+                device.setDeviceName(definition.DeviceName);
+                device.setDescription(definition.Description);
+                device.setJson(dummyData.Clone());
+                await StartDeviceSimulation(device, cancellationToken);
+                lock (_deviceLock)
+                {
+                    _devices.Add(device);
+                }
+            }
+        });
+
     }
 
     public void LoadAlarms(string alarmsString)
@@ -100,10 +108,10 @@ public class DeviceSimulator : IDeviceSimulator
 
     public async Task PublishAlarms(CancellationToken cancellationToken = default)
     {
-        if (_devices.Count == 0)
-        {
-            throw new InvalidOperationException("Load devices before publishing alarms.");
-        }
+        // if (_devices.Count == 0)
+        // {
+        //     throw new InvalidOperationException("Load devices before publishing alarms.");
+        // }
 
         SimulatedDevice selectedDevice;
         DeviceAlarm selectedAlarm;
@@ -129,12 +137,6 @@ public class DeviceSimulator : IDeviceSimulator
     public async Task Start(CancellationToken cancellationToken = default)
     {
         SubscribeToCommands(cancellationToken);
-
-        foreach  (var device in _devices)
-        {
-            await StartDeviceSimulation(device, cancellationToken);
-        }
-      
     }
 
     private void SubscribeToCommands(CancellationToken cancellationToken)
@@ -152,38 +154,28 @@ public class DeviceSimulator : IDeviceSimulator
 
     public Task StartDeviceSimulation(SimulatedDevice device, CancellationToken cancellationToken)
     {
-          if (_messageBus is null)
+        if (_messageBus is null)
         {
             throw new InvalidOperationException("Call Load before Start.");
         }
 
-        _running = true;
-
-        Console.WriteLine("Starting device simulation for {device.DeviceName}...");
-
-        _ = Task.Run(async () =>
+        lock (_deviceLock)
         {
-            try
+            if (_deviceTasks.ContainsKey(device.DeviceId))
             {
-                while (_running && !cancellationToken.IsCancellationRequested)
-                {
-                    Console.WriteLine($"Updating device properties and publishing telemetry for {device.DeviceName} every {device.RefreshRate} ms...");
+                return Task.CompletedTask;
+            }
 
-                    device.refreshFromJson();
-                    await PublishTelemetry(device, cancellationToken);
+            CancellationTokenSource deviceStop =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            Task deviceTask = RunDeviceSimulationAsync(device, deviceStop.Token);
+            Task alarmTask = RunAlarmSimulationAsync(device, deviceStop.Token);
 
-                    await Task.Delay(device.RefreshRate, cancellationToken);
-                }
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                Console.WriteLine("Simulation cancelled.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Simulation error: {ex}");
-            }
-        }, cancellationToken);
+            _deviceStops[device.DeviceId] = deviceStop;
+            _deviceTasks[device.DeviceId] = deviceTask;
+            _alarmTasks[device.DeviceId] = alarmTask;
+            _running = true;
+        }
 
         return Task.CompletedTask;
     }
@@ -191,6 +183,137 @@ public class DeviceSimulator : IDeviceSimulator
     public void Stop()
     {
         _running = false;
+        StopAsync().GetAwaiter().GetResult();
+    }
+
+    public async Task StopAsync()
+    {
+        _running = false;
+        await StopAllDeviceSimulationsAsync();
+    }
+
+    public async Task StopDeviceSimulationAsync(string deviceId)
+    {
+        CancellationTokenSource? deviceStop;
+        Task? deviceTask;
+        Task? alarmTask;
+
+        lock (_deviceLock)
+        {
+            _deviceStops.Remove(deviceId, out deviceStop);
+            _deviceTasks.Remove(deviceId, out deviceTask);
+            _alarmTasks.Remove(deviceId, out alarmTask);
+            _devices.RemoveAll(device => device.DeviceId == deviceId);
+        }
+
+        if (deviceStop is null)
+        {
+            return;
+        }
+
+        try
+        {
+            deviceStop.Cancel();
+
+            List<Task> tasks = new(2);
+            if (deviceTask is not null)
+            {
+                tasks.Add(deviceTask);
+            }
+
+            if (alarmTask is not null)
+            {
+                tasks.Add(alarmTask);
+            }
+
+            if (tasks.Count > 0)
+            {
+                await Task.WhenAll(tasks);
+            }
+        }
+        finally
+        {
+            deviceStop.Dispose();
+        }
+    }
+
+    private async Task StopAllDeviceSimulationsAsync()
+    {
+        string[] deviceIds;
+        lock (_deviceLock)
+        {
+            deviceIds = _deviceStops.Keys.ToArray();
+        }
+
+        foreach (string deviceId in deviceIds)
+        {
+            await StopDeviceSimulationAsync(deviceId);
+        }
+    }
+
+    private async Task RunDeviceSimulationAsync(
+        SimulatedDevice device,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            Console.WriteLine($"Starting device simulation for {device.DeviceName}...");
+
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                Console.WriteLine($"Updating device properties and publishing telemetry for {device.DeviceName} every {device.RefreshRate} ms...");
+
+                device.refreshFromJson();
+                await PublishTelemetry(device, cancellationToken);
+                await Task.Delay(device.RefreshRate, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            Console.WriteLine($"Simulation cancelled for {device.DeviceId}.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Simulation error for {device.DeviceId}: {ex}");
+        }
+    }
+
+    private async Task RunAlarmSimulationAsync(
+        SimulatedDevice device,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                DeviceAlarm[] configuredAlarms = _alarms.TryGetValue(
+                    device.DeviceType.ToFriendlyString(),
+                    out DeviceAlarm[]? alarms)
+                    ? alarms
+                    : [];
+
+                if (configuredAlarms.Length > 0)
+                {
+                    DeviceAlarm selectedAlarm;
+                    lock (_random)
+                    {
+                        selectedAlarm = configuredAlarms[_random.Next(configuredAlarms.Length)];
+                    }
+
+                    await PublishAlarm(device, selectedAlarm, cancellationToken);
+                }
+
+                await Task.Delay(AlarmInterval, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            Console.WriteLine($"Alarm simulation cancelled for {device.DeviceId}.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Alarm simulation error for {device.DeviceId}: {ex}");
+        }
     }
 
     private async Task OnCommand(DeviceCommand command, CancellationToken cancellationToken)
@@ -262,6 +385,8 @@ public class DeviceSimulator : IDeviceSimulator
 
         await PublishResult(command, device, accepted ? "acknowledged" : "rejected", reason, cancellationToken);
     }
+
+    
 
     private Task PublishAlarm(
         SimulatedDevice device,

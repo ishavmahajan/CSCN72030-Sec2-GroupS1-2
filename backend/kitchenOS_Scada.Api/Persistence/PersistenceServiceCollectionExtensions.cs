@@ -12,7 +12,7 @@ public static class PersistenceServiceCollectionExtensions
             ?? throw new InvalidOperationException(
                 "Connection string 'Postgres' is required.");
 
-        services.AddDbContext<KitchenOsDbContext>(options =>
+        services.AddDbContextFactory<KitchenOsDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.EnableRetryOnFailure()));
 

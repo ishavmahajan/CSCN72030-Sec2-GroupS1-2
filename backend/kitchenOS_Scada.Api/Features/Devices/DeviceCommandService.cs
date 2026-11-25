@@ -1,9 +1,7 @@
 using System.Text.Json;
-using kitchenOS.Simulator;
-using kitchenOS_Scada.Api.Simulator.Devices;
-using kitchenOS_Scada.Contract.Enums;
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
 using kitchenOS_Scada.Contract.Messaging;
+using kitchenOS_Scada.Api.Persistence.Repositories;
 
 namespace kitchenOS_Scada.Api.Features.Devices;
 
@@ -22,7 +20,7 @@ public sealed record DeviceCommandSubmissionResult(
     bool DeviceNotFound = false);
 
 public sealed class DeviceCommandService(
-    DeviceSimulator simulator,
+    IDeviceRepository repository,
     IMessageBus messageBus)
     : IDeviceCommandService
 {
@@ -38,14 +36,12 @@ public sealed class DeviceCommandService(
             return new(null, "A supported command name is required.");
         }
 
-        SimulatedDevice? device = simulator.GetDevices()
-            .Find(candidate => candidate.DeviceId == deviceId);
-        if (device is null)
+        if (!await repository.ExistsAsync(deviceId, cancellationToken))
         {
             return new(null, "Device was not found.", DeviceNotFound: true);
         }
 
-        string? validationError = ValidateArguments(device, request);
+        string? validationError = ValidateArguments(request);
         if (validationError is not null)
         {
             return new(null, validationError);
@@ -71,27 +67,13 @@ public sealed class DeviceCommandService(
         return new(command, null);
     }
 
-    private static string? ValidateArguments(
-        SimulatedDevice device,
-        SendDeviceCommandRequest request)
+    private static string? ValidateArguments(SendDeviceCommandRequest request)
     {
         // Online checks do not require point-specific arguments.
         CommandArguments? arguments = request.Arguments;
         if (request.CommandName == "isOnline")
         {
             return null;
-        }
-
-        if (device.DeviceType == DeviceTypes.Stove && string.IsNullOrWhiteSpace(arguments?.Component))
-        {
-            return "A burner component is required for this device.";
-        }
-
-        List<PointReading> points = device.ReadPoints();
-        if (!string.IsNullOrWhiteSpace(arguments?.Component) &&
-            !points.Exists(point => point.Component == arguments.Component))
-        {
-            return "The component does not exist on this device.";
         }
 
         if (request.CommandName == "setMode" && string.IsNullOrWhiteSpace(arguments?.Mode))
@@ -109,23 +91,14 @@ public sealed class DeviceCommandService(
             return "setValue requires a point name and a value.";
         }
 
-        PointReading? selectedPoint = points.Find(point =>
-            point.Name == arguments.Name && point.Component == arguments.Component);
-        if (selectedPoint is null)
+        bool validValue = arguments.Value.ValueKind switch
         {
-            return "The point does not exist on this device.";
-        }
-
-        bool validValue = selectedPoint.Value switch
-        {
-            double => arguments.Value.ValueKind == JsonValueKind.Number &&
-                arguments.Value.TryGetDouble(out double number) && double.IsFinite(number),
-            string => arguments.Value.ValueKind == JsonValueKind.String &&
-                !string.IsNullOrWhiteSpace(arguments.Value.GetString()),
-            bool => arguments.Value.ValueKind is JsonValueKind.True or JsonValueKind.False,
+            JsonValueKind.Number => arguments.Value.TryGetDouble(out double number) && double.IsFinite(number),
+            JsonValueKind.String => !string.IsNullOrWhiteSpace(arguments.Value.GetString()),
+            JsonValueKind.True or JsonValueKind.False => true,
             _ => false
         };
 
-        return validValue ? null : "The value must match the point's number, text, or boolean type.";
+        return validValue ? null : "The value must be a finite number, non-empty string, or boolean.";
     }
 }

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using kitchenOS_Scada.Contract.Enums;
 
-namespace kitchenOS_Scada.Api.Simulator.Devices;
+namespace kitchenOS.Simulator.Devices;
 
 public class WalkInFreezer : SimulatedDevice
 {
