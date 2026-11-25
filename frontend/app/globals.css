@@ -295,3 +295,13 @@ footer { font-size:12px; }
 .modal-submit { display:flex; align-items:center; gap:7px; color:#fff; border-color:#ff7818 !important; background:#f36b08; }
 .modal-submit:hover { background:#ff7818; }
 @media (max-width:520px) { .modal-backdrop { padding:12px; place-items:end center; }.setpoint-modal { margin-bottom:env(safe-area-inset-bottom); } }
+
+
+.auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #0f172a; color: #e2e8f0; }
+.auth-card { width: min(100%, 400px); display: grid; gap: 14px; padding: 32px; border: 1px solid #334155; border-radius: 16px; background: #1e293b; }
+.auth-card h1 { font-size: 28px; font-weight: 700; }
+.auth-card input { width: 100%; padding: 12px; color: #0f172a; background: white; border-radius: 6px; }
+.auth-card button { background: #2563eb; padding: 12px; border-radius: 6px; color: white; }
+.auth-card button:disabled { opacity: .6; }
+.auth-card small { color: #cbd5e1; }
+.auth-card [role="alert"], .auth-notice { color: #fca5a5; }
