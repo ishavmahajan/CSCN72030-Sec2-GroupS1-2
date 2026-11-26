@@ -21,6 +21,7 @@ public class DeviceSimulator : IDeviceSimulator
     private IMessageBus? _messageBus;
     private bool _running;
     private bool _commandsSubscribed;
+    private bool _inventoryUpdatesSubscribed;
 
     // An optional random source keeps alarm generation deterministic in tests.
     public DeviceSimulator(Random? random = null)
@@ -61,6 +62,65 @@ public class DeviceSimulator : IDeviceSimulator
             }
         });
 
+        SubscribeToDeviceInventoryUpdates(parsedSimulationRoot);
+
+    }
+
+    private void SubscribeToDeviceInventoryUpdates(JsonElement simulationRoot)
+    {
+        if (_messageBus is null || _inventoryUpdatesSubscribed)
+        {
+            return;
+        }
+
+        _messageBus.Subscribe<DeviceRegistered>(
+            MessageChannels.DeviceInventoryUpdates,
+            (integrationEvent, cancellationToken) =>
+                OnDeviceRegisteredAsync(integrationEvent, simulationRoot, cancellationToken));
+
+        _inventoryUpdatesSubscribed = true;
+    }
+
+    private async Task OnDeviceRegisteredAsync(
+        DeviceRegistered integrationEvent,
+        JsonElement simulationRoot,
+        CancellationToken cancellationToken)
+    {
+        DeviceInventoryDefinition definition = integrationEvent.Device;
+        string deviceType = definition.DeviceType.ToFriendlyString();
+
+        if (!simulationRoot.TryGetProperty(deviceType, out JsonElement deviceJson))
+        {
+            Console.WriteLine(
+                $"Cannot start device {definition.DeviceId}: no simulation configuration exists for {deviceType}.");
+            return;
+        }
+
+        lock (_deviceLock)
+        {
+            if (_deviceTasks.ContainsKey(definition.DeviceId))
+            {
+                return;
+            }
+        }
+
+        SimulatedDevice device = SimulatedDevice.Create(deviceType, deviceJson.Clone());
+        device.setDeviceId(definition.DeviceId);
+        device.setDeviceName(definition.DeviceName);
+        device.setDescription(definition.Description);
+        device.setJson(deviceJson.Clone());
+
+        await StartDeviceSimulation(device, cancellationToken);
+
+        lock (_deviceLock)
+        {
+            if (_devices.All(existing => existing.DeviceId != device.DeviceId))
+            {
+                _devices.Add(device);
+            }
+        }
+
+        Console.WriteLine($"Added and started simulation for device {device.DeviceId}.");
     }
 
     public void LoadAlarms(string alarmsString)

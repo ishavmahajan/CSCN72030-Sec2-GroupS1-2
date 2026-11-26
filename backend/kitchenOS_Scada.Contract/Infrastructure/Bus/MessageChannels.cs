@@ -13,6 +13,9 @@ public static class MessageChannels
 
     public const string CommandResultEvents = "kitchenos:events:command-results";
 
-    public const string DeviceInventory = "kitchenos:device-inventory";
+    public const string DeviceInventory = "kitchenos:events:device-inventory-initialization";
+
+    public const string DeviceInventoryUpdates = "kitchenos:events:device-inventory-updates";
+
 }
 

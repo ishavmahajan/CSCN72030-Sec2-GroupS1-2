@@ -8,4 +8,13 @@ public sealed record DeviceInventoryResponse(
     string Description,
     bool IsActive,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    IReadOnlyList<DeviceTelemetryPointResponse>? ReadPoints = null,
+    DateTimeOffset? LastTelemetryAtUtc = null);
+
+/// <summary>Represents the latest persisted telemetry point for a device.</summary>
+public sealed record DeviceTelemetryPointResponse(
+    string Name,
+    object Value,
+    string? Unit,
+    string? Component);

@@ -24,12 +24,12 @@ export function useDeviceCommands(apiUrl: string, onAcknowledged: (deviceId: str
     setToasts((current) => current.filter((toast) => toast.id !== id))
   }, [])
 
-  function notify(entry: PendingCommand, kind: CommandToast['kind'], text: string) {
+  const notify = useCallback((entry: PendingCommand, kind: CommandToast['kind'], text: string) => {
     setToasts((current) => [
       ...current.filter((toast) => toast.id !== entry.toastId),
       { id: entry.toastId, deviceName: entry.deviceName, kind, text },
     ])
-  }
+  }, [])
 
   useEffect(() => {
     const requests = pending.current
@@ -42,7 +42,7 @@ export function useDeviceCommands(apiUrl: string, onAcknowledged: (deviceId: str
     }
   }, [])
 
-  function finish(deviceId: string, entry: PendingCommand, text: string, kind: 'success' | 'error' = 'error') {
+  const finish = useCallback((deviceId: string, entry: PendingCommand, text: string, kind: 'success' | 'error' = 'error') => {
     if (pending.current.get(deviceId) !== entry) return
     clearTimeout(entry.timer)
     pending.current.delete(deviceId)
@@ -52,9 +52,9 @@ export function useDeviceCommands(apiUrl: string, onAcknowledged: (deviceId: str
       return next
     })
     notify(entry, kind, text)
-  }
+  }, [notify])
 
-  function receiveResult(deviceId: string, result: CommandResult) {
+  const receiveResult = useCallback((deviceId: string, result: CommandResult) => {
     const entry = pending.current.get(deviceId)
     if (!entry) return
     if (!entry.id) {
@@ -69,7 +69,7 @@ export function useDeviceCommands(apiUrl: string, onAcknowledged: (deviceId: str
     }
     if (result.status === 'rejected') finish(deviceId, entry, result.reason ? `Command rejected. ${result.reason}` : 'Command rejected.')
     if (result.status === 'timedOut') finish(deviceId, entry, 'Command timed out. Check the equipment state before retrying.')
-  }
+  }, [onAcknowledged, finish])
 
   async function submit(deviceId: string, deviceName: string, request: CommandRequest) {
     if (pending.current.has(deviceId)) return
