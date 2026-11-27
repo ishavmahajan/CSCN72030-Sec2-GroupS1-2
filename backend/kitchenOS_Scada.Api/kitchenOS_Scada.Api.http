@@ -4,3 +4,13 @@ GET {{kitchenOS_Scada.Api_HostAddress}}/health/
 Accept: application/json
 
 ###
+
+### Remove a device (requires an administrator session and CSRF token)
+DELETE {{kitchenOS_Scada.Api_HostAddress}}/devices/MIX-001
+X-CSRF-TOKEN: {{csrfToken}}
+Cookie: KitchenOS.Session={{sessionCookie}}
+
+### Remove a device that is not active
+DELETE {{kitchenOS_Scada.Api_HostAddress}}/devices/UNKNOWN-001
+X-CSRF-TOKEN: {{csrfToken}}
+Cookie: KitchenOS.Session={{sessionCookie}}
