@@ -37,6 +37,10 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
 .page-heading h1 { font-size: clamp(24px, 3vw, 34px); font-weight: 700; letter-spacing: -.035em; line-height: 1.15; }
 .create-device-button, .modal-submit { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; padding: 0 14px; border-radius: 8px; background: var(--accent); color: #211209; font-size: 13px; font-weight: 750; }
 .create-device-button:hover { background: #ffb17e; }
+.remove-device-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:36px; padding:0 11px; color:#ffb0a7; border:1px solid #713931; border-radius:8px; background:#321713; font-size:12px; font-weight:700; }
+.remove-device-button:hover:enabled { color:#fff; border-color:#ff786b; background:#4a201a; }
+.remove-device-button:disabled { opacity:.65; }
+.remove-device-error { margin:0 0 14px; padding:10px 12px; color:#ffb0a7; border:1px solid #713931; border-radius:8px; background:#321713; font-size:13px; }
 .connection-banner { display: flex; align-items: flex-start; gap: 10px; padding: 13px 15px; margin-bottom: 16px; border: 1px solid #854139; border-radius: 10px; background: #321713; color: #ffccc6; }
 .connection-banner svg { flex: none; margin-top: 2px; }
 .connection-banner span { display: block; margin-top: 2px; font-size: 13px; }
@@ -85,7 +89,7 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
 .detail-title svg { flex: none; color: var(--accent); }
 .detail-title h2 { font-size: 20px; font-weight: 700; line-height: 1.2; }
 .detail-title p { margin-top: 5px; color: var(--muted); font-size: 13px; }
-.detail-statuses { flex-shrink: 0; max-width: 40%; }
+.detail-statuses { display:flex; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:9px; max-width:55%; }
 .detail-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .reading-display, .detail-stats { padding: 16px; min-width: 0; }
 .reading-highlight > span { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 6px; font-size: clamp(25px, 3vw, 40px); font-weight: 700; line-height: 1.1; overflow-wrap: anywhere; }

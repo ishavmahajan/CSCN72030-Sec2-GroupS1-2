@@ -119,11 +119,28 @@ public sealed class DevicesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public Task<IActionResult> RemoveDevice(
+    public async Task<IActionResult> RemoveDevice(
         string deviceId,
         CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            return BadRequest(new { error = "Device ID is required." });
+        }
+
+        DeviceOperationResult<bool> result = await _removalService.RemoveAsync(
+            deviceId,
+            cancellationToken);
+
+        return result.Error switch
+        {
+            DeviceOperationError.None => NoContent(),
+            DeviceOperationError.NotFound => NotFound(new { error = result.ErrorMessage }),
+            DeviceOperationError.EventPublicationFailed => Problem(
+                result.ErrorMessage,
+                statusCode: StatusCodes.Status503ServiceUnavailable),
+            _ => Problem("An error occurred while removing the device.")
+        };
     }
 
     /// <summary>Rejects command requests that do not specify a device ID.</summary>

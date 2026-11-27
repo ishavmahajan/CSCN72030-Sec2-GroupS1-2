@@ -78,6 +78,11 @@ public class DeviceSimulator : IDeviceSimulator
             (integrationEvent, cancellationToken) =>
                 OnDeviceRegisteredAsync(integrationEvent, simulationRoot, cancellationToken));
 
+        _messageBus.Subscribe<DeviceRemoved>(
+            MessageChannels.DeviceInventoryRemovals,
+            (integrationEvent, _) =>
+                StopDeviceSimulationAsync(integrationEvent.DeviceId));
+
         _inventoryUpdatesSubscribed = true;
     }
 

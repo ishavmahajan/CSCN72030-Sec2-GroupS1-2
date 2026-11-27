@@ -102,12 +102,24 @@ public sealed class DeviceRepository(KitchenOsDbContext dbContext) : IDeviceRepo
         return $"{prefix}-{nextNumber:000}";
     }
 
-    public Task<bool> DeactivateAsync(
+    public async Task<bool> DeactivateAsync(
         string deviceId,
         DateTimeOffset deactivatedAtUtc,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        DeviceEntity? device = await _dbContext.Devices
+            .SingleOrDefaultAsync(
+                candidate => candidate.DeviceId == deviceId && candidate.IsActive,
+                cancellationToken);
+
+        if (device is null)
+        {
+            return false;
+        }
+
+        device.IsActive = false;
+        device.UpdatedAtUtc = deactivatedAtUtc;
+        return true;
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)

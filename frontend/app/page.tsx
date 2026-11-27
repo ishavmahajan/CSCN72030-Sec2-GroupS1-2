@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Bell, ClipboardList, ChevronRight, Fan, Gauge, Layers3, LayoutGrid, Menu, Plus, Snowflake, Square, Utensils, Volume2, VolumeX, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
+import { Activity, AlertTriangle, Bell, ClipboardList, ChevronRight, Fan, Gauge, Layers3, LayoutGrid, LoaderCircle, Menu, Plus, Snowflake, Square, Trash2, Utensils, Volume2, VolumeX, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
 import { DeviceCommandControls, type DevicePoint } from '../components/device-command-controls'
 import { CommandToasts } from '../components/command-toasts'
 import { CreateDeviceDialog, type CreatedDevice } from '../components/create-device-dialog'
@@ -290,7 +290,7 @@ function DeviceCard({ device, selected, running, connected, hasCriticalAlarm, on
   </button>
 }
 
-function DetailPanel({ device, connected, children }: { device: Device; connected: boolean; children: React.ReactNode }) {
+function DetailPanel({ device, connected, canRemove, removing, onRemove, children }: { device: Device; connected: boolean; canRemove: boolean; removing: boolean; onRemove: () => void; children: React.ReactNode }) {
   const Icon = device.icon
   const unit = device.unit === 'C' ? '°C' : device.unit
   const running = isRunning(device)
@@ -301,6 +301,10 @@ function DetailPanel({ device, connected, children }: { device: Device; connecte
       <div className="detail-title"><Icon size={27} /><div><h2 id="equipment-detail-title" tabIndex={-1}>{device.name}</h2><p>{device.description}</p></div></div>
       <div className="detail-statuses">
         <OperatingState running={running} connected={connected} />
+        {canRemove && <button className="remove-device-button" onClick={onRemove} disabled={removing}>
+          {removing ? <LoaderCircle className="spin" size={16} /> : <Trash2 size={16} />}
+          {removing ? 'Removing…' : 'Remove device'}
+        </button>}
       </div>
     </div>
     <div className="detail-main">
@@ -350,6 +354,8 @@ export default function Page() {
   const [acknowledgingAlarmGroups, setAcknowledgingAlarmGroups] = useState<Set<string>>(() => new Set())
   const [alarmError, setAlarmError] = useState('')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [removingDeviceId, setRemovingDeviceId] = useState('')
+  const [removeError, setRemoveError] = useState('')
 
   const refreshAlarmHistory = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -628,6 +634,27 @@ export default function Page() {
     setSelectedId(nextDevice.id)
   }
 
+  async function handleRemove(device: Device) {
+    if (!window.confirm(`Remove "${device.name}" from the dashboard? This action cannot be undone.`)) return
+
+    setRemovingDeviceId(device.id)
+    setRemoveError('')
+    try {
+      const response = await sessionFetch(`/devices/${encodeURIComponent(device.id)}`, { method: 'DELETE' })
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string; detail?: string } | null
+        throw new Error(body?.error ?? body?.detail ?? `Could not remove device (${response.status}).`)
+      }
+
+      setDevices((current) => current.filter((item) => item.id !== device.id))
+      setSelectedId((current) => current === device.id ? '' : current)
+    } catch (cause) {
+      setRemoveError(cause instanceof Error ? cause.message : 'Could not remove device.')
+    } finally {
+      setRemovingDeviceId('')
+    }
+  }
+
   const navItems = [
     { label: 'Overview', target: 'overview', icon: LayoutGrid },
     { label: 'Equipment', target: 'equipment', icon: ClipboardList },
@@ -783,6 +810,7 @@ export default function Page() {
           <div className="kpi"><span className="kpi-icon"><Fan /></span><div><b>{connected && inventoryStatus === 'ready' ? devices.filter(isRunning).length : '—'}</b><small>Equipment running</small></div></div>
           <div className="kpi"><span className="kpi-icon"><AlertTriangle /></span><div><b>{alarms.length}</b><small>Recorded alarms</small></div></div>
         </section>
+        {removeError && <p className="remove-device-error" role="alert">{removeError}</p>}
         <div className={`dashboard-grid ${selected ? '' : 'without-selection'}`}>
           <section id="equipment" tabIndex={-1} className="equipment-section" aria-labelledby="equipment-title">
             <div className="section-title"><h2 id="equipment-title">Equipment</h2></div>
@@ -793,7 +821,8 @@ export default function Page() {
               connected={connected} hasCriticalAlarm={criticalDeviceIds.has(device.id)} onSelect={() => selectDevice(device.id)}
             />)}</div>}
           </section>
-          {selected && <DetailPanel device={selected} connected={connected}>
+          {selected && <DetailPanel device={selected} connected={connected} canRemove={canCreate}
+            removing={removingDeviceId === selected.id} onRemove={() => void handleRemove(selected)}>
             {!canOperate ? <p className="command-feedback">Viewer access · Monitoring only</p> : capabilityStatus === 'ready'
               ? <DeviceCommandControls key={selected.id} profile={profile} points={selected.points} deviceName={selected.name} running={isRunning(selected)}
                   disabled={!connected || pendingDevices.has(selected.id)} onSubmit={(request) => void submit(selected.id, selected.name, request)} />

@@ -303,6 +303,27 @@ public class DeviceCommandEndpointTests
         }
     }
 
+    [TestMethod]
+    public async Task RemovingDevice_DeactivatesAndPublishesRemovalEventOnlyOnce()
+    {
+        FakeDeviceRepository repository = new("MIX-001");
+        DeviceRemovalService service = new(repository, _bus);
+
+        DeviceOperationResult<bool> removed = await service.RemoveAsync("MIX-001");
+        DeviceRemoved removalEvent = _bus.Messages
+            .Select(message => message.Message)
+            .OfType<DeviceRemoved>()
+            .Single();
+        DeviceOperationResult<bool> repeated = await service.RemoveAsync("MIX-001");
+
+        Assert.AreEqual(DeviceOperationError.None, removed.Error);
+        Assert.AreEqual(MessageChannels.DeviceInventoryRemovals,
+            _bus.Messages.Single().Channel);
+        Assert.AreEqual("MIX-001", removalEvent.DeviceId);
+        Assert.AreEqual(DeviceOperationError.NotFound, repeated.Error);
+        Assert.AreEqual(1, _bus.Messages.Count);
+    }
+
     private Task<HttpResponseMessage> PostAsync(string deviceId, string json) =>
         _client.PostAsync($"/devices/{deviceId}/commands", new StringContent(json, Encoding.UTF8, "application/json"));
 
@@ -352,12 +373,12 @@ public class DeviceCommandEndpointTests
             DateTimeOffset deactivatedAtUtc,
             CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException();
+            return Task.FromResult(_deviceIds.Remove(deviceId));
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException();
+            return Task.CompletedTask;
         }
     }
 
