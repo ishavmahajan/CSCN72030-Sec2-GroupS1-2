@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, type FormEvent } from 'react'
+import { Pause, Play } from 'lucide-react'
+import { createContext, useContext, useEffect, useRef, useState, type FormEvent } from 'react'
 import { sessionFetch, type SessionUser } from '../lib/auth-api'
 
 const SessionContext = createContext<{ user: SessionUser; logout: () => Promise<void> } | null>(null)
@@ -10,6 +11,46 @@ export function useSession() {
   return session
 }
 
+function LoginBackground() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [playing, setPlaying] = useState(false)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    video.defaultPlaybackRate = 0.5
+    video.playbackRate = 0.5
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    function syncMotionPreference() {
+      if (reducedMotion.matches) video?.pause()
+      else void video?.play().catch(() => {})
+    }
+
+    syncMotionPreference()
+    reducedMotion.addEventListener('change', syncMotionPreference)
+    return () => reducedMotion.removeEventListener('change', syncMotionPreference)
+  }, [])
+
+  function togglePlayback() {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) void video.play().catch(() => {})
+    else video.pause()
+  }
+
+  return <>
+    <video ref={videoRef} className="auth-video" src="/login-kitchen.mp4" muted loop playsInline preload="none"
+      aria-hidden="true" onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)} />
+    <div className="auth-video-overlay" aria-hidden="true" />
+    <button type="button" className="auth-video-control" onClick={togglePlayback}
+      aria-label={playing ? 'Pause background video' : 'Play background video'}>
+      {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
+    </button>
+  </>
+}
+
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
@@ -17,12 +58,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [animateDashboard, setAnimateDashboard] = useState(false)
 
-  async function refresh() {
+  async function refresh(afterSignIn = false) {
     const response = await sessionFetch('/auth/me')
     if (response.status === 401) { setUser(null); return }
     if (!response.ok) throw new Error('Could not check your session.')
-    setUser(await response.json() as SessionUser)
+    const session = await response.json() as SessionUser
+    setAnimateDashboard(afterSignIn)
+    setUser(session)
   }
   useEffect(() => {
     let active = true
@@ -42,7 +86,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       })
       if (!response.ok) throw new Error(response.status === 429 ? 'Too many attempts. Try again in a minute.' : 'Sign-in failed. Check your details or try again later.')
       setPassword('')
-      await refresh()
+      await refresh(true)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not sign in.') }
     finally { setBusy(false) }
   }
@@ -55,13 +99,22 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (loading) return <main className="auth-screen"><p>Checking your session…</p></main>
-  if (user) return <SessionContext.Provider value={{ user, logout }}>{error && <p className="auth-notice" role="alert">{error}</p>}{children}</SessionContext.Provider>
-  return <main className="auth-screen"><form className="auth-card" onSubmit={login}>
-    <h1>KitchenOS</h1><p>Sign in to monitor your kitchen.</p>
-    <label htmlFor="email">Email</label><input id="email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
-    <label htmlFor="password">Password</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
-    {error && <p role="alert">{error}</p>}
-    <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-    <small>Ask your administrator if you need an account.</small>
-  </form></main>
+  if (user) return <SessionContext.Provider value={{ user, logout }}>
+    <div className={animateDashboard ? 'dashboard-enter' : undefined}>
+      {error && <p className="auth-notice" role="alert">{error}</p>}
+      {children}
+    </div>
+  </SessionContext.Provider>
+  return <main className="auth-screen auth-screen-with-video">
+    <form className="auth-card" onSubmit={login}>
+      <h1><img className="auth-logo" src="/kitchenos-logo.svg" alt="KitchenOS" width={460} height={112} /></h1>
+      <p className="auth-subtitle">Sign in to monitor your kitchen.</p>
+      <label htmlFor="email">Email</label><input id="email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
+      <label htmlFor="password">Password</label><input id="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+      {error && <p role="alert">{error}</p>}
+      <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+      <small>Ask your administrator if you need an account.</small>
+    </form>
+    <LoginBackground />
+  </main>
 }
