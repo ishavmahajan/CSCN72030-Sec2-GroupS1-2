@@ -18,5 +18,13 @@ public sealed class AlarmEntity
 
     public bool IsActive { get; set; } = true;
 
+    public string? AcknowledgedByOperatorId { get; set; }
+
+    public string? AcknowledgedByOperator { get; set; }
+
+    public DateTimeOffset? AcknowledgedAtUtc { get; set; }
+
     public EventTypeEntity EventType { get; set; } = null!;
+
+    public DeviceEntity Device { get; set; } = null!;
 }

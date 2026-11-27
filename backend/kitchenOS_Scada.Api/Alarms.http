@@ -1,0 +1,35 @@
+@baseUrl = http://localhost:8080
+@csrfToken = replace-with-token-from-auth-csrf
+
+### Get persisted alarm history
+GET {{baseUrl}}/alarms
+
+### Acknowledge an alarm (requires an authenticated Operator or Administrator session and CSRF token)
+POST {{baseUrl}}/alarms/acknowledgements
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrfToken}}
+
+{
+  "alarmId": 1,
+  "deviceId": "MIX-001"
+}
+
+### Unknown alarm returns 404
+POST {{baseUrl}}/alarms/acknowledgements
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrfToken}}
+
+{
+  "alarmId": 999999,
+  "deviceId": "MIX-001"
+}
+
+### Invalid device ID returns 400
+POST {{baseUrl}}/alarms/acknowledgements
+Content-Type: application/json
+X-CSRF-TOKEN: {{csrfToken}}
+
+{
+  "alarmId": 1,
+  "deviceId": ""
+}

@@ -42,4 +42,9 @@ public class AlarmBody : IMessage
     public string Code { get; set; } = "";
     public string Severity { get; set; } = "";
     public string Text { get; set; } = "";
+    public long? AlarmId { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string? AcknowledgedByOperatorId { get; set; }
+    public string? AcknowledgedByOperator { get; set; }
+    public DateTimeOffset? AcknowledgedAtUtc { get; set; }
 }

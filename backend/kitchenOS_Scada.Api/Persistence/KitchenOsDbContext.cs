@@ -16,6 +16,7 @@ public sealed class KitchenOsDbContext(DbContextOptions<KitchenOsDbContext> opti
 
     public DbSet<AlarmEntity> Alarms => Set<AlarmEntity>();
 
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(KitchenOsDbContext).Assembly);

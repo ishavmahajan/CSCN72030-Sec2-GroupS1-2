@@ -31,6 +31,20 @@ namespace kitchenOS_Scada.Api.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("AlarmId"));
 
+                    b.Property<DateTimeOffset?>("AcknowledgedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at_utc");
+
+                    b.Property<string>("AcknowledgedByOperator")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("acknowledged_by_operator");
+
+                    b.Property<string>("AcknowledgedByOperatorId")
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)")
+                        .HasColumnName("acknowledged_by_operator_id");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -407,12 +421,19 @@ namespace kitchenOS_Scada.Api.Persistence.Migrations
                             Description = "Device telemetry event",
                             IsActive = true,
                             Name = "telemetry"
+                        },
+                        new
+                        {
+                            EventTypeId = 2,
+                            Description = "Device alarm event",
+                            IsActive = true,
+                            Name = "alarm"
                         });
                 });
 
             modelBuilder.Entity("kitchenOS_Scada.Api.Persistence.Entities.AlarmEntity", b =>
                 {
-                    b.HasOne("kitchenOS_Scada.Api.Persistence.Entities.DeviceEntity", null)
+                    b.HasOne("kitchenOS_Scada.Api.Persistence.Entities.DeviceEntity", "Device")
                         .WithMany("Alarms")
                         .HasForeignKey("DeviceId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -423,6 +444,8 @@ namespace kitchenOS_Scada.Api.Persistence.Migrations
                         .HasForeignKey("EventTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Device");
 
                     b.Navigation("EventType");
                 });

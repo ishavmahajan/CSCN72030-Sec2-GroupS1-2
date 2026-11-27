@@ -46,12 +46,23 @@ internal sealed class AlarmEntityConfiguration : IEntityTypeConfiguration<AlarmE
             .HasColumnName("is_active")
             .HasDefaultValue(true);
 
+        builder.Property(alarm => alarm.AcknowledgedByOperatorId)
+            .HasColumnName("acknowledged_by_operator_id")
+            .HasMaxLength(450);
+
+        builder.Property(alarm => alarm.AcknowledgedByOperator)
+            .HasColumnName("acknowledged_by_operator")
+            .HasMaxLength(256);
+
+        builder.Property(alarm => alarm.AcknowledgedAtUtc)
+            .HasColumnName("acknowledged_at_utc");
+
         builder.HasOne(alarm => alarm.EventType)
             .WithMany(eventType => eventType.Alarms)
             .HasForeignKey(alarm => alarm.EventTypeId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne<DeviceEntity>()
+        builder.HasOne(alarm => alarm.Device)
             .WithMany(device => device.Alarms)
             .HasForeignKey(alarm => alarm.DeviceId)
             .HasPrincipalKey(device => device.DeviceId)

@@ -3,7 +3,7 @@ import type { CommandRequest } from './device-capabilities'
 import { sessionFetch } from './auth-api'
 
 export type CommandResult = { commandId: string; status: string; reason?: string }
-export type CommandToast = { id: number; deviceName: string; kind: 'pending' | 'success' | 'error'; text: string }
+export type CommandToast = { id: number; deviceName: string; kind: 'pending' | 'success' | 'error' | 'alarm' | 'warning' | 'critical'; text: string }
 
 type PendingCommand = {
   toastId: number
@@ -22,6 +22,11 @@ export function useDeviceCommands(apiUrl: string, onAcknowledged: (deviceId: str
   const [toasts, setToasts] = useState<CommandToast[]>([])
   const dismissToast = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id))
+  }, [])
+  const dismissAllToasts = useCallback(() => setToasts([]), [])
+  const showToast = useCallback((notification: Omit<CommandToast, 'id'>) => {
+    const toast = { ...notification, id: ++nextToastId.current }
+    setToasts((current) => [...current, toast])
   }, [])
 
   const notify = useCallback((entry: PendingCommand, kind: CommandToast['kind'], text: string) => {
@@ -112,6 +117,6 @@ export function useDeviceCommands(apiUrl: string, onAcknowledged: (deviceId: str
     }
   }
 
-  return { pendingDevices, toasts, dismissToast, receiveResult, submit }
+  return { pendingDevices, toasts, dismissToast, dismissAllToasts, showToast, receiveResult, submit }
 }
 
