@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using kitchenOS_Scada.Contract.Enums;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Tests;
 
@@ -35,7 +35,18 @@ public class MixerTests
         Assert.AreEqual("on", mixer.Motor);
 
         mixer.StopComponent(null);
-        // Preserve the simulator's current trailing-space state value.
-        Assert.AreEqual("off ", mixer.Motor);
+        Assert.AreEqual("off", mixer.Motor);
+    }
+
+    [TestMethod]
+    public void TrySetMode_UpdatesTheMode()
+    {
+        var mixer = new Mixer();
+
+        var accepted = mixer.TrySetMode("high", null, out var reason);
+
+        Assert.IsTrue(accepted);
+        Assert.IsNull(reason);
+        Assert.AreEqual("high", mixer.Mode);
     }
 }

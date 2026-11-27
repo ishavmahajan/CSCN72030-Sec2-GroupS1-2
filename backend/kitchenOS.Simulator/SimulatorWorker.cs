@@ -17,21 +17,19 @@ internal sealed class SimulatorWorker(
             AppContext.BaseDirectory,
             "SimulatorFiles",
             "simulation.json");
-        string alarmsPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "SimulatorFiles",
-            "alarm.json");
+        string alarmsPath = Path.Combine(AppContext.BaseDirectory, "SimulatorFiles", "alarm.json");
 
         string devicesJson = await File.ReadAllTextAsync(devicesPath, stoppingToken);
         string simulationJson = await File.ReadAllTextAsync(simulationPath, stoppingToken);
         string alarmsJson = await File.ReadAllTextAsync(alarmsPath, stoppingToken);
 
-        simulator.Load(devicesJson, simulationJson, alarmsJson, messageBus);
+        simulator.Load(devicesJson, simulationJson, messageBus);
+        simulator.LoadAlarms(alarmsJson);
         await simulator.Start(stoppingToken);
 
         try
         {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -39,7 +37,7 @@ internal sealed class SimulatorWorker(
         }
         finally
         {
-            simulator.Stop();
+            await simulator.StopAsync();
         }
     }
 }

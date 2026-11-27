@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using kitchenOS.Simulator;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Tests.Simulator;
 
@@ -18,7 +18,6 @@ public class DeviceSimulatorUpdateTests
         simulator.Load(
             """[{ "deviceName": "Mixer-1", "deviceType": "MIXER" }]""",
             DeviceSimulatorTestData.SimulationJson,
-            DeviceSimulatorTestData.AlarmJson,
             new RecordingMessageBus());
 
         var devices = simulator.GetDevices();

@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using kitchenOS.Simulator;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Tests.Simulator;
 
@@ -23,7 +23,6 @@ public class DeviceSimulatorLoadTests
             ]
             """,
             DeviceSimulatorTestData.SimulationJson,
-            DeviceSimulatorTestData.AlarmJson,
             new RecordingMessageBus());
 
         var devices = simulator.GetDevices();
@@ -44,13 +43,11 @@ public class DeviceSimulatorLoadTests
         simulator.Load(
             """[{ "deviceName": "Mixer-1", "deviceType": "MIXER" }]""",
             DeviceSimulatorTestData.SimulationJson,
-            DeviceSimulatorTestData.AlarmJson,
             messageBus);
 
         simulator.Load(
             """[{ "deviceName": "Blender-1", "deviceType": "BLENDER" }]""",
             DeviceSimulatorTestData.SimulationJson,
-            DeviceSimulatorTestData.AlarmJson,
             messageBus);
 
         var devices = simulator.GetDevices();
@@ -73,8 +70,8 @@ public class DeviceSimulatorLoadTests
             ]
             """,
             DeviceSimulatorTestData.SimulationJson,
-            DeviceSimulatorTestData.AlarmJson,
             new RecordingMessageBus());
+        simulator.LoadAlarms(DeviceSimulatorTestData.AlarmJson);
 
         IReadOnlyList<DeviceAlarm> mixerAlarms = simulator.GetAlarms("MIX-001");
         IReadOnlyList<DeviceAlarm> sinkAlarms = simulator.GetAlarms("SNK-001");

@@ -1,4 +1,10 @@
 using System.Net;
+using kitchenOS_Scada.Api.Tests.Security;
+using kitchenOS_Scada.Api.Security;
+using kitchenOS_Scada.Api.Features.Devices.Contracts;
+using kitchenOS_Scada.Api.Features.Devices.Queries;
+using kitchenOS_Scada.Api.Features.Devices.Registration;
+using kitchenOS_Scada.Api.Features.Devices.Removal;
 using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Text;
@@ -7,7 +13,10 @@ using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Features.Devices;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Notifier;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS_Scada.Api.Persistence;
+using kitchenOS_Scada.Api.Persistence.Entities;
+using kitchenOS_Scada.Api.Persistence.Repositories;
+using kitchenOS.Simulator.Devices;
 using kitchenOS_Scada.Api.Tests.Simulator;
 using kitchenOS_Scada.Contract.Events;
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
@@ -16,6 +25,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -26,6 +36,7 @@ namespace kitchenOS_Scada.Api.Tests.Commands;
 public class DeviceCommandEndpointTests
 {
     private readonly RecordingMessageBus _bus = new();
+    private readonly TestIdentityProvider _identity = new();
     private readonly DeviceSimulator _simulator = new();
     private readonly CancellationTokenSource _shutdown = new();
     private WebApplication _app = default!;
@@ -50,20 +61,34 @@ public class DeviceCommandEndpointTests
               "OVEN":{"door":["closed"],"mode":["bake"]}
             }
             """,
-            DeviceSimulatorTestData.AlarmJson,
             _bus);
 
-        WebApplicationBuilder builder = WebApplication.CreateBuilder();
+        WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
+        _identity.Configure(builder.Services);
+        UnusedInventoryServices inventory = new();
         builder.Services.AddSingleton<IMessageBus>(_bus);
         builder.Services.AddSingleton(_simulator);
-        builder.Services.AddSingleton<IDeviceCommandService, DeviceCommandService>();
+        builder.Services.AddDeviceManagement();
+        builder.Services.RemoveAll<IDeviceRepository>();
+        builder.Services.AddSingleton<IDeviceRepository>(new FakeDeviceRepository(
+            "MIX-001",
+            "SNK-001",
+            "OVN-001"));
+        builder.Services.AddSingleton<IDeviceQueryService>(inventory);
+        builder.Services.AddSingleton<IDeviceRegistrationService>(inventory);
+        builder.Services.AddSingleton<IDeviceRemovalService>(inventory);
+        builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
         builder.Services.AddControllers()
             .AddApplicationPart(typeof(DevicesController).Assembly);
         _app = builder.Build();
+        await _identity.InitializeAsync(_app.Services);
+        _app.UseKitchenOsSecurity();
+        _app.MapKitchenOsIdentity();
         _app.MapControllers();
         await _app.StartAsync();
         _client = new HttpClient { BaseAddress = new Uri(_app.Urls.Single()) };
+        await _identity.LoginAsync(_client);
     }
 
     [TestCleanup]
@@ -78,6 +103,7 @@ public class DeviceCommandEndpointTests
             await _app.DisposeAsync();
         }
         _shutdown.Dispose();
+        _identity.Dispose();
     }
 
     [DataTestMethod]
@@ -278,6 +304,61 @@ public class DeviceCommandEndpointTests
     private Task<HttpResponseMessage> PostAsync(string deviceId, string json) =>
         _client.PostAsync($"/devices/{deviceId}/commands", new StringContent(json, Encoding.UTF8, "application/json"));
 
+    // Command tests never invoke inventory operations or require PostgreSQL.
+    private sealed class UnusedInventoryServices : IDeviceQueryService, IDeviceRegistrationService, IDeviceRemovalService
+    {
+        public Task<IReadOnlyList<DeviceInventoryResponse>> GetActiveAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<DeviceInventoryResponse?> GetByIdAsync(string deviceId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<DeviceOperationResult<DeviceInventoryResponse>> RegisterAsync(RegisterDeviceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<DeviceOperationResult<bool>> RemoveAsync(string deviceId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeDeviceRepository(params string[] deviceIds) : IDeviceRepository
+    {
+        private readonly HashSet<string> _deviceIds =
+            new(deviceIds, StringComparer.OrdinalIgnoreCase);
+
+        public Task<bool> ExistsAsync(
+            string deviceId,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_deviceIds.Contains(deviceId));
+        }
+
+        public Task<IReadOnlyList<DeviceEntity>> GetActiveAsync(
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<DeviceEntity?> GetByIdAsync(
+            string deviceId,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task AddAsync(
+            DeviceEntity device,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<bool> DeactivateAsync(
+            string deviceId,
+            DateTimeOffset deactivatedAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
     private sealed class RecordingNotifier : IClientNotifier
     {
         public List<string> Events { get; } = [];
@@ -307,3 +388,4 @@ public class DeviceCommandEndpointTests
         }
     }
 }
+

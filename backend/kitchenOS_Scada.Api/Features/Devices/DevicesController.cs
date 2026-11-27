@@ -1,37 +1,143 @@
-using kitchenOS.Simulator;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS_Scada.Api.Features.Devices.Contracts;
+using kitchenOS_Scada.Api.Features.Devices.Queries;
+using kitchenOS_Scada.Api.Features.Devices.Registration;
+using kitchenOS_Scada.Api.Features.Devices.Removal;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using kitchenOS_Scada.Api.Security;
 using StackExchange.Redis;
 
 namespace kitchenOS_Scada.Api.Features.Devices;
 
+[Authorize(Policy = AuthorizationPolicies.Monitor)]
 [ApiController]
 [Route("devices")]
-public sealed class DevicesController(
-    DeviceSimulator simulator,
-    IDeviceCommandService commandService,
-    ILogger<DevicesController> logger) : ControllerBase
+public sealed class DevicesController : ControllerBase
 {
-    /// <summary>Returns all simulated devices and their current points.</summary>
-    [HttpGet]
-    [ProducesResponseType<IReadOnlyList<DeviceResponse>>(StatusCodes.Status200OK)]
-    public ActionResult<IReadOnlyList<DeviceResponse>> GetDevices()
-    {
-        IReadOnlyList<DeviceResponse> devices = simulator.GetDevices()
-            .Select(DeviceDtoMappings.ToResponse)
-            .ToArray();
+    private readonly IDeviceQueryService _queryService;
+    private readonly IDeviceRegistrationService _registrationService;
+    private readonly IDeviceRemovalService _removalService;
+    private readonly IDeviceCommandService _commandService;
+    private readonly ILogger<DevicesController> _logger;
 
-        return Ok(devices);
+    public DevicesController(
+        IDeviceQueryService queryService,
+        IDeviceRegistrationService registrationService,
+        IDeviceRemovalService removalService,
+        IDeviceCommandService commandService,
+        ILogger<DevicesController> logger)
+    {
+        _queryService = queryService;
+        _registrationService = registrationService;
+        _removalService = removalService;
+        _commandService = commandService;
+        _logger = logger;
+    }
+
+    /// <summary>Returns all active devices in the persisted inventory.</summary>
+    [HttpGet]
+    [ProducesResponseType<IReadOnlyList<DeviceInventoryResponse>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<DeviceInventoryResponse>>> GetDevices(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            IReadOnlyList<DeviceInventoryResponse> devices =
+                await _queryService.GetActiveAsync(cancellationToken);
+
+            return Ok(devices);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(exception, "Error retrieving active devices");
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new { error = "An error occurred while retrieving active devices." });
+        }
+    }
+
+    /// <summary>Returns one device from the persisted inventory.</summary>
+    [HttpGet("{deviceId}")]
+    [ProducesResponseType<DeviceInventoryResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DeviceInventoryResponse>> GetDevice(
+        string deviceId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            return BadRequest(new { error = "Device ID is required." });
+        }
+
+        DeviceInventoryResponse? device = await _queryService.GetByIdAsync(
+            deviceId,
+            cancellationToken);
+
+        return device is null ? NotFound() : Ok(device);
+    }
+
+    /// <summary>Registers a device in the persisted inventory.</summary>
+    [HttpPost]
+    [Authorize(Policy = AuthorizationPolicies.Administer)]
+    [ProducesResponseType<DeviceInventoryResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<DeviceInventoryResponse>> RegisterDevice(
+        RegisterDeviceRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest(new { error = "A device registration request is required." });
+        }
+
+        DeviceOperationResult<DeviceInventoryResponse> result =
+            await _registrationService.RegisterAsync(request, cancellationToken);
+
+        return result.Error switch
+        {
+            DeviceOperationError.None => CreatedAtAction(
+                nameof(GetDevice),
+                new { deviceId = result.Value!.DeviceId },
+                result.Value),
+            DeviceOperationError.Duplicate => Conflict(new { error = result.ErrorMessage }),
+            DeviceOperationError.InvalidDeviceType or DeviceOperationError.ValidationFailed =>
+                BadRequest(new { error = result.ErrorMessage }),
+            DeviceOperationError.EventPublicationFailed => Problem(
+                result.ErrorMessage,
+                statusCode: StatusCodes.Status503ServiceUnavailable),
+            _ => Problem("An error occurred while registering the device.")
+        };
+    }
+
+    /// <summary>Removes a device from the active persisted inventory.</summary>
+    [HttpDelete("{deviceId}")]
+    [Authorize(Policy = AuthorizationPolicies.Administer)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IActionResult> RemoveDevice(
+        string deviceId,
+        CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>Rejects command requests that do not specify a device ID.</summary>
     [HttpPost("commands")]
+    [Authorize(Policy = AuthorizationPolicies.Operate)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult SendCommandWithoutDeviceId() =>
-        BadRequest(new { error = "Device ID is required." });
+    public IActionResult SendCommandWithoutDeviceId()
+    {
+        return BadRequest(new { error = "Device ID is required." });
+    }
 
     /// <summary>Queues a command for a simulated device.</summary>
     [HttpPost("{deviceId}/commands")]
+    [Authorize(Policy = AuthorizationPolicies.Operate)]
     [ProducesResponseType<QueuedDeviceCommandResponse>(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -53,7 +159,7 @@ public sealed class DevicesController(
 
         try
         {
-            DeviceCommandSubmissionResult result = await commandService.SubmitAsync(
+            DeviceCommandSubmissionResult result = await _commandService.SubmitAsync(
                 deviceId,
                 request,
                 cancellationToken);
@@ -77,10 +183,11 @@ public sealed class DevicesController(
         }
         catch (Exception exception) when (exception is RedisException or TimeoutException)
         {
-            logger.LogError(exception, "Could not queue command for device {DeviceId}", deviceId);
+            _logger.LogError(exception, "Could not queue command for device {DeviceId}", deviceId);
             return Problem(
                 "The command bus is unavailable.",
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
     }
 }
+

@@ -1,5 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Tests;
 
@@ -14,10 +14,11 @@ public class BlenderTests
     {
         // The simulator uses the first speed value from the telemetry list.
         var blender = Blender.FromJson(JsonSamples.Parse("""
-            { "motor": "on", "speed": [8000, 12000], "power": 900, "energy": 6.1 }
+            { "motor": "on", "mode": "HIGH", "speed": [8000, 12000], "power": 900, "energy": 6.1 }
             """));
 
         Assert.AreEqual("on", blender.Motor);
+        Assert.AreEqual("HIGH", blender.Mode);
         Assert.AreEqual(8000, blender.Speed);
         Assert.AreEqual(900, blender.Power);
         Assert.AreEqual(6.1, blender.Energy);
@@ -47,5 +48,17 @@ public class BlenderTests
         Assert.IsTrue(accepted);
         Assert.IsNull(reason);
         Assert.AreEqual(12000, blender.Speed);
+    }
+
+    [TestMethod]
+    public void TrySetMode_UpdatesMode()
+    {
+        var blender = new Blender();
+
+        var accepted = blender.TrySetMode("PULSE", null, out var reason);
+
+        Assert.IsTrue(accepted);
+        Assert.IsNull(reason);
+        Assert.AreEqual("PULSE", blender.Mode);
     }
 }

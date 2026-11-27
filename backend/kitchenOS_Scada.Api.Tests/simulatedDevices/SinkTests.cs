@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using kitchenOS_Scada.Contract.Enums;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Tests;
 
@@ -16,6 +16,8 @@ public class SinkTests
         var sink = Sink.FromJson(JsonSamples.Parse("""
             {
               "temperature": 42,
+              "setpoint": 40,
+              "mode": "MANUAL",
               "flow": 6.5,
               "consumption": 1280,
               "leak": false,
@@ -25,6 +27,8 @@ public class SinkTests
 
         Assert.AreEqual(DeviceTypes.Sink, sink.DeviceType);
         Assert.AreEqual(42, sink.Temperature);
+        Assert.AreEqual(40, sink.Setpoint);
+        Assert.AreEqual("MANUAL", sink.Mode);
         Assert.AreEqual(6.5, sink.Flow);
         Assert.AreEqual(1280, sink.Consumption);
         Assert.IsFalse(sink.Leak);
@@ -35,12 +39,15 @@ public class SinkTests
     public void ReadPoints_UsesSinkNamesAndUnits()
     {
         var sink = Sink.FromJson(JsonSamples.Parse("""
-            { "temperature": 42, "flow": 6.5, "consumption": 1280, "leak": false, "valve": "open" }
+            { "temperature": 42, "setpoint": 40, "mode": "MANUAL", "flow": 6.5, "consumption": 1280, "leak": false, "valve": "open" }
             """));
 
         var points = sink.ReadPoints();
 
         Assert.AreEqual("C", Point(points, "temperature").Unit);
+        Assert.AreEqual(40.0, Point(points, "setpoint").Value);
+        Assert.AreEqual("C", Point(points, "setpoint").Unit);
+        Assert.AreEqual("MANUAL", Point(points, "mode").Value);
         Assert.AreEqual("L/min", Point(points, "flow").Unit);
         Assert.AreEqual("L", Point(points, "consumption").Unit);
         Assert.AreEqual(false, Point(points, "leak").Value);
@@ -49,15 +56,39 @@ public class SinkTests
     }
 
     [TestMethod]
-    public void TrySetValue_Temperature_UpdatesTheProperty()
+    public void TrySetValue_Setpoint_UpdatesTheProperty()
     {
         var sink = new Sink();
 
-        var accepted = sink.TrySetValue("temperature", 55.0, null, out var reason);
+        var accepted = sink.TrySetValue("setpoint", 55.0, null, out var reason);
 
         Assert.IsTrue(accepted);
         Assert.IsNull(reason);
-        Assert.AreEqual(55, sink.Temperature);
+        Assert.AreEqual(55, sink.Setpoint);
+    }
+
+    [TestMethod]
+    public void TrySetValue_Temperature_IsReadOnly()
+    {
+        var sink = new Sink { Temperature = 42 };
+
+        var accepted = sink.TrySetValue("temperature", 55.0, null, out var reason);
+
+        Assert.IsFalse(accepted);
+        Assert.AreEqual("unknown property", reason);
+        Assert.AreEqual(42, sink.Temperature);
+    }
+
+    [TestMethod]
+    public void TrySetMode_UpdatesMode()
+    {
+        var sink = new Sink();
+
+        var accepted = sink.TrySetMode("DRAIN", null, out var reason);
+
+        Assert.IsTrue(accepted);
+        Assert.IsNull(reason);
+        Assert.AreEqual("DRAIN", sink.Mode);
     }
 
     [TestMethod]

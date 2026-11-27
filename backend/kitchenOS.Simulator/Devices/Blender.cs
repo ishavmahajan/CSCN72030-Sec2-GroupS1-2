@@ -1,12 +1,14 @@
 using System.Text.Json;
 using kitchenOS_Scada.Contract.Enums;
 
-namespace kitchenOS_Scada.Api.Simulator.Devices;
+
+namespace kitchenOS.Simulator.Devices;
 
 // Simulates blender motor, speed, power, and energy telemetry.
 public class Blender : SimulatedDevice
 {
     public string Motor { get; set; } = "off";
+    public string Mode { get; set; } = "LOW";
     public double Speed { get; set; }
     public double Power { get; set; }
     public double Energy { get; set; }
@@ -25,6 +27,7 @@ public class Blender : SimulatedDevice
     {
         var blender = new Blender();
         blender.Motor = DeviceJson.ReadText(json, "motor");
+        blender.Mode = DeviceJson.ReadText(json, "mode");
         blender.Speed = DeviceJson.ReadNumber(json, "speed");
         blender.speedChoices.AddRange(DeviceJson.ReadNumberList(json, "speed"));
         blender.Power = DeviceJson.ReadNumber(json, "power");
@@ -37,6 +40,7 @@ public class Blender : SimulatedDevice
         Random random = new Random();
         JsonElement json = _json;
         Motor = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "motor"));
+        // Mode = DeviceJson.Pick(random, DeviceJson.ReadTextList(json, "mode"));
         Speed = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "speed"), Speed, false);
         Power = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "power"), Power, false);
         Energy = DeviceJson.Pick(random, DeviceJson.ReadNumberList(json, "energy"), Energy, false);
@@ -54,6 +58,7 @@ public class Blender : SimulatedDevice
         return new List<PointReading>
         {
             new PointReading("motor", Motor, null, null),
+            new PointReading("mode", Mode, null, null),
             new PointReading("speed", Speed, "rpm", null),
             new PointReading("power", Power, "W", null),
             new PointReading("energy", Energy, "kWh", null)
@@ -91,4 +96,11 @@ public class Blender : SimulatedDevice
         Motor = "off";
         return true;
     } 
+
+    public override bool TrySetMode(string mode, string? component, out string? reason)
+    {
+        Mode = mode;
+        reason = null;
+        return true;
+    }
 }

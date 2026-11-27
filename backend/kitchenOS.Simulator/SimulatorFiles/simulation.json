@@ -3,6 +3,7 @@
   "WALK_IN_FREEZER": {
     "temperature": [-25, -22, -20, -18, -15],
     "setpoint": [-25, -22, -20, -18, -15],
+    "mode": ["NORMAL", "ENERGY_SAVER", "FAST_FREEZE", "DEFROST"],
     "compressor": ["on", "off"],
     "door": ["closed", "open"],
     "power": [0, 500, 700, 860, 1000],
@@ -45,7 +46,7 @@
     "setpoint": [50, 100, 150, 180, 220],
     "timer": [0, 300, 600, 1200, 1800],
     "door": ["closed", "open"],
-    "mode": ["bake", "broil", "roast", "convection", "off"],
+    "mode": ["BAKE", "ROAST", "BROIL", "CONVECTION", "KEEP_WARM"],
     "power": [0, 1000, 2000, 3200, 4000],
     "energy": [0, 20, 40, 60, 100]
   },
@@ -54,7 +55,7 @@
     "speed": [0, 60, 120, 180, 240],
     "power": [0, 250, 500, 750, 1000],
     "energy": [0, 5, 10, 15, 20],
-    "mode": ["idle", "mixing", "kneading", "whipping", "stopped"]
+    "mode": ["STIR", "BEAT", "WHIP", "KNEAD"]
   },
   "EXHAUST_FAN": {
     "fanSpeed": [0, 20, 40, 60, 100],
@@ -66,14 +67,16 @@
   },
   "BLENDER": {
     "motor": ["on", "off"],
+    "mode": ["LOW", "MEDIUM", "HIGH", "PULSE"],
     "speed": [0, 4000, 8000, 12000, 16000],
     "power": [0, 300, 600, 900, 1200],
-    "energy": [0, 2, 4, 6, 10],
-    "mode": ["idle", "blend", "pulse", "crush", "stopped"]
+    "energy": [0, 2, 4, 6, 10]
   },
   "DISHWASHER": {
     "temperature": [20, 40, 60, 70, 80],
+    "setpoint": [50, 60, 70],
     "cycle": ["idle", "washing", "rinsing", "drying", "completed"],
+    "mode": ["QUICK", "NORMAL", "HEAVY", "ECO", "SELF_CLEAN"],
     "waterLevel": [0, 20, 40, 60, 80],
     "detergent": [0, 20, 40, 60, 100],
     "power": [0, 500, 1000, 1500, 2100],
@@ -81,6 +84,8 @@
   },
   "SINK": {
     "temperature": [10, 20, 30, 40, 50],
+    "setpoint": [20, 30, 40, 50],
+    "mode": ["MANUAL", "AUTO_FILL", "WASH", "RINSE", "SANITIZE", "DRAIN"],
     "flow": [0, 2, 4, 6, 8],
     "consumption": [0, 250, 500, 1000, 1500],
     "leak": [true, false],

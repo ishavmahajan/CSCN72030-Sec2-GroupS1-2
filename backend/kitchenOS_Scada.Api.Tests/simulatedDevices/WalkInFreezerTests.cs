@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using kitchenOS_Scada.Contract.Enums;
-using kitchenOS_Scada.Api.Simulator.Devices;
+using kitchenOS.Simulator.Devices;
 
 namespace kitchenOS_Scada.Api.Tests;
 
@@ -31,6 +31,22 @@ public class WalkInFreezerTests
         Assert.AreEqual("closed", freezer.Door);
         Assert.AreEqual(860, freezer.Power);
         Assert.AreEqual(412.6, freezer.Energy);
+    }
+
+    [TestMethod]
+    public void StartAndStop_ChangeOnlyTheFreezerRunningState()
+    {
+        var freezer = new WalkInFreezer { Compressor = "on", Power = 860, Energy = 25 };
+        Assert.IsTrue(freezer.IsRunning);
+        Assert.IsTrue((bool)freezer.ReadPoints().Single(point => point.Name == "isRunning").Value);
+
+        Assert.IsTrue(freezer.StopComponent(null));
+        Assert.IsFalse(freezer.IsRunning);
+        Assert.IsFalse((bool)freezer.ReadPoints().Single(point => point.Name == "isRunning").Value);
+
+        Assert.IsTrue(freezer.StartComponent(null));
+        Assert.IsTrue(freezer.IsRunning);
+        Assert.IsTrue((bool)freezer.ReadPoints().Single(point => point.Name == "isRunning").Value);
     }
 
     [TestMethod]

@@ -1,12 +1,14 @@
 using System.Net.WebSockets;
 using kitchenOS_Scada.Contract.Infrastructure.Bus;
-using kitchenOS_Scada.Api.Simulator;
 using kitchenOS_Scada.Api.Notifier;
 using StackExchange.Redis;
 using kitchenOS_Scada.Api.Helpers;
-using kitchenOS.Simulator;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Features.Devices;
+using kitchenOS_Scada.Api.Persistence;
+using Microsoft.EntityFrameworkCore;
+using kitchenOS_Scada.Api.Security;
+
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,11 +16,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Register the MVC and OpenAPI services used by the HTTP API.
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
+builder.Services.AddKitchenOsSecurity(builder.Configuration);
+builder.Services.AddDeviceManagement();
+builder.Services.AddKitchenOsPersistence(builder.Configuration);
 
-// Keep the simulator and command service in-process so API requests can use the
-// same device state that produces telemetry for connected clients.
-builder.Services.AddSingleton<DeviceSimulator>();
-builder.Services.AddSingleton<IDeviceCommandService, DeviceCommandService>();
+// Queue commands for the separately hosted simulator through the message bus.
+builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
 
 // Allow the local frontend to call the API while keeping the policy scoped to
 // the known development origin.
@@ -26,9 +29,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3020")
+        policy.WithOrigins(builder.Configuration["Security:FrontendOrigin"] ?? "http://localhost:3020")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -56,20 +60,25 @@ builder.Services.AddHostedService<MessageBusService>();
 
 
 var app = builder.Build();
+await app.InitializeKitchenOsIdentityAsync();
 
-// Load the initial simulation before serving requests so device endpoints have
-// a complete, consistent view of the simulated devices.
-var simulator = app.Services.GetRequiredService<DeviceSimulator>();
-string devicesJson = FileHelper.GetSimulationData("devices.json");
-string simulationJson = FileHelper.GetSimulationData("simulation.json");
-string alarmsPath = Path.Combine(AppContext.BaseDirectory, "SimulatorFiles", "alarm.json");
-string alarmsJson = File.ReadAllText(alarmsPath);
-simulator.Load(devicesJson, simulationJson, alarmsJson, app.Services.GetRequiredService<IMessageBus>());
+// Apply pending EF Core migrations before the API begins accepting requests.
+// This keeps the database schema synchronized with the deployed application.
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    KitchenOsDbContext dbContext = scope.ServiceProvider
+        .GetRequiredService<KitchenOsDbContext>();
+
+    await dbContext.Database.MigrateAsync();
+}
+
+await app.Services.LoadDeviceToSimulator();
 
 // Configure middleware before mapping HTTP and WebSocket endpoints.
 app.UseWebSockets();
 app.UseCors("Frontend");
 app.UseHttpsRedirection();
+app.UseKitchenOsSecurity();
 
 if (app.Environment.IsDevelopment())
 {
@@ -77,6 +86,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.MapKitchenOsIdentity();
 app.MapControllers();
 
 // Provide a lightweight liveness endpoint for local orchestration and probes.
@@ -84,7 +94,23 @@ app.MapGet("/health", () =>
 {
     return Results.Ok(new { status = "Healthy" });
 })
-.WithName("GetHealth");
+.WithName("GetHealth").AllowAnonymous();
+
+// Keep database readiness separate from process liveness so orchestration can
+// distinguish an unavailable dependency from a stopped API process.
+app.MapGet("/health/database", async (
+    KitchenOsDbContext dbContext,
+    CancellationToken cancellationToken) =>
+{
+    bool canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
+
+    return canConnect
+        ? Results.Ok(new { status = "Healthy" })
+        : Results.Problem(
+            "PostgreSQL is unavailable.",
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+})
+.WithName("GetDatabaseHealth");
 
 // Accept WebSocket clients and remove them from the notifier when they close
 // normally, disconnect unexpectedly, or cancel the request.
@@ -133,6 +159,7 @@ app.Map("/ws", async (HttpContext context, WebSocketClientNotifier notifier) =>
     {
         notifier.RemoveClient(clientId);
     }
-}).WithName("WebSocketEndpoint");
+}).WithName("WebSocketEndpoint").RequireAuthorization(AuthorizationPolicies.Monitor);
 app.Run();
+
 

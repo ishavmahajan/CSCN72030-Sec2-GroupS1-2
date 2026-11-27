@@ -1,7 +1,7 @@
 using System.Text.Json;
 using kitchenOS_Scada.Contract.Enums;
 
-namespace kitchenOS_Scada.Api.Simulator.Devices;
+namespace kitchenOS.Simulator.Devices;
 
 // Simulates a mixer while preserving command-set speed values during updates.
 public class Mixer : SimulatedDevice
@@ -91,7 +91,20 @@ public class Mixer : SimulatedDevice
 
     public override bool StopComponent(string? component)
     {
-        Motor = "off ";
+        Motor = "off";
+        return true;
+    }
+
+    public override bool TrySetMode(string mode, string? component, out string? reason)
+    {
+        if (string.Equals(mode, "broil", StringComparison.OrdinalIgnoreCase))
+        {
+            reason = "The broil mode is not supported by a mixer.";
+            return false;
+        }
+
+        Mode = mode;
+        reason = null;
         return true;
     }
 
