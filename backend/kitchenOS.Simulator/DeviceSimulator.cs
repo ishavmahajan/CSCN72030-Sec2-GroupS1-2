@@ -417,13 +417,25 @@ public class DeviceSimulator : IDeviceSimulator
                     break;
                 }
                 accepted = device.TrySetValue(arguments.Name, value, arguments.Component, out reason);
+                if (accepted)
+                {
+                    await PublishTelemetry(device, cancellationToken);
+                }
                 break;
             case "start":
                 accepted = device.StartComponent(arguments?.Component);
+                 if (accepted)
+                {
+                    await PublishTelemetry(device, cancellationToken);
+                }
                 reason = accepted ? null : "The device or component cannot be started.";
                 break;
             case "stop":
                 accepted = device.StopComponent(arguments?.Component);
+                  if (accepted)
+                {
+                    await PublishTelemetry(device, cancellationToken);
+                }
                 reason = accepted ? null : "The device or component cannot be stopped.";
                 break;
             case "setMode":
@@ -434,6 +446,10 @@ public class DeviceSimulator : IDeviceSimulator
                     break;
                 }
                 accepted = device.TrySetMode(arguments.Mode, arguments.Component, out reason);
+                  if (accepted)
+                {
+                    await PublishTelemetry(device, cancellationToken);
+                }
                 break;
             default:
                 accepted = false;
