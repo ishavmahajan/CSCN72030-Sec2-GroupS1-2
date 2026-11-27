@@ -22,6 +22,39 @@ namespace kitchenOS_Scada.Api.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("kitchenOS_Scada.Api.Persistence.Entities.AlarmAcknowledgementEntity", b =>
+                {
+                    b.Property<long>("AlarmId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("alarm_id");
+
+                    b.Property<DateTimeOffset>("AcknowledgedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acknowledged_at_utc");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("device_id");
+
+                    b.Property<string>("OperatorId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)")
+                        .HasColumnName("operator_id");
+
+                    b.Property<string>("OperatorName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("operator_name");
+
+                    b.HasKey("AlarmId");
+
+                    b.ToTable("alarm_acknowledgements", (string)null);
+                });
+
             modelBuilder.Entity("kitchenOS_Scada.Api.Persistence.Entities.AlarmEntity", b =>
                 {
                     b.Property<long>("AlarmId")
@@ -407,12 +440,30 @@ namespace kitchenOS_Scada.Api.Persistence.Migrations
                             Description = "Device telemetry event",
                             IsActive = true,
                             Name = "telemetry"
+                        },
+                        new
+                        {
+                            EventTypeId = 2,
+                            Description = "Device alarm event",
+                            IsActive = true,
+                            Name = "alarm"
                         });
+                });
+
+            modelBuilder.Entity("kitchenOS_Scada.Api.Persistence.Entities.AlarmAcknowledgementEntity", b =>
+                {
+                    b.HasOne("kitchenOS_Scada.Api.Persistence.Entities.AlarmEntity", "Alarm")
+                        .WithOne("Acknowledgement")
+                        .HasForeignKey("kitchenOS_Scada.Api.Persistence.Entities.AlarmAcknowledgementEntity", "AlarmId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Alarm");
                 });
 
             modelBuilder.Entity("kitchenOS_Scada.Api.Persistence.Entities.AlarmEntity", b =>
                 {
-                    b.HasOne("kitchenOS_Scada.Api.Persistence.Entities.DeviceEntity", null)
+                    b.HasOne("kitchenOS_Scada.Api.Persistence.Entities.DeviceEntity", "Device")
                         .WithMany("Alarms")
                         .HasForeignKey("DeviceId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -423,6 +474,8 @@ namespace kitchenOS_Scada.Api.Persistence.Migrations
                         .HasForeignKey("EventTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Device");
 
                     b.Navigation("EventType");
                 });
@@ -453,6 +506,11 @@ namespace kitchenOS_Scada.Api.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("EventType");
+                });
+
+            modelBuilder.Entity("kitchenOS_Scada.Api.Persistence.Entities.AlarmEntity", b =>
+                {
+                    b.Navigation("Acknowledgement");
                 });
 
             modelBuilder.Entity("kitchenOS_Scada.Api.Persistence.Entities.DeviceEntity", b =>

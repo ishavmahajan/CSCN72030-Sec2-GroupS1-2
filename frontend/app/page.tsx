@@ -36,19 +36,65 @@ type ApiDevice = {
   description: string
   readPoints?: DevicePoint[]
 }
-type AlarmEvent = { id: string; deviceId: string; deviceType: string; code: string; severity: string; text: string; timestamp: string }
+type AlarmEvent = {
+  alarmId: number
+  deviceId: string
+  deviceType: string
+  code: string
+  severity: string
+  text: string
+  timestamp: string
+  isActive: boolean
+  acknowledgedByOperatorId: string | null
+  acknowledgedByOperator: string | null
+  acknowledgedAtUtc: string | null
+}
+type AlarmAcknowledgement = {
+  alarmId: number
+  deviceId: string
+  operatorId: string
+  operatorName: string
+  acknowledgedAtUtc: string
+  alreadyAcknowledged: boolean
+}
 type DeviceEvent = {
   eventName: string
   deviceId: string
   deviceType: string
   timestamp: string
   message?: Partial<CommandResult> & {
+    alarmId?: number
+    deviceId?: string
+    deviceType?: string
     values?: DevicePoint[]
     code?: string
     severity?: string
     text?: string
     timestamp?: string
+    isActive?: boolean
+    acknowledgedByOperatorId?: string | null
+    acknowledgedByOperator?: string | null
+    acknowledgedAtUtc?: string | null
   }
+}
+
+function mergeAlarm(current: AlarmEvent | undefined, incoming: AlarmEvent): AlarmEvent {
+  if (!current) return incoming
+  return {
+    ...current,
+    ...incoming,
+    acknowledgedByOperatorId: incoming.acknowledgedByOperatorId ?? current.acknowledgedByOperatorId,
+    acknowledgedByOperator: incoming.acknowledgedByOperator ?? current.acknowledgedByOperator,
+    acknowledgedAtUtc: incoming.acknowledgedAtUtc ?? current.acknowledgedAtUtc,
+  }
+}
+
+function mergeAlarms(current: AlarmEvent[], incoming: AlarmEvent[]): AlarmEvent[] {
+  const alarms = new Map(current.map((alarm) => [alarm.alarmId, alarm]))
+  for (const alarm of incoming) alarms.set(alarm.alarmId, mergeAlarm(alarms.get(alarm.alarmId), alarm))
+  return [...alarms.values()]
+    .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
+    .slice(0, 5)
 }
 
 const deviceMetadata: Record<string, { icon: LucideIcon; color: string; type: string }> = {
@@ -266,7 +312,28 @@ export default function Page() {
   const [inventoryStatus, setInventoryStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [inventoryAttempt, setInventoryAttempt] = useState(0)
   const [alarms, setAlarms] = useState<AlarmEvent[]>([])
+  const [locallyDismissedAlarmIds, setLocallyDismissedAlarmIds] = useState<Set<number>>(() => new Set())
+  const [acknowledgingAlarmIds, setAcknowledgingAlarmIds] = useState<Set<number>>(() => new Set())
+  const [alarmError, setAlarmError] = useState('')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+
+  const refreshAlarmHistory = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await sessionFetch('/alarms', { signal })
+      if (!response.ok) throw new Error(`Alarm history request failed: ${response.status}`)
+      const items = await response.json() as Array<Omit<AlarmEvent, 'timestamp'> & { occurredAtUtc: string }>
+      if (signal?.aborted) return
+      setAlarms((current) => mergeAlarms(current, items.map((alarm) => ({
+        ...alarm,
+        timestamp: alarm.occurredAtUtc,
+      }))))
+      setAlarmError('')
+    } catch (error) {
+      if (signal?.aborted) return
+      console.error('Could not load persisted alarms', error)
+      setAlarmError('Alarm history could not be loaded.')
+    }
+  }, [])
 
   useEffect(() => {
     let disposed = false
@@ -307,6 +374,12 @@ export default function Page() {
   }, [inventoryAttempt])
 
   useEffect(() => {
+    const controller = new AbortController()
+    void refreshAlarmHistory(controller.signal)
+    return () => controller.abort()
+  }, [refreshAlarmHistory])
+
+  useEffect(() => {
     let disposed = false
     let socket: WebSocket
     let retry: ReturnType<typeof setTimeout>
@@ -314,7 +387,10 @@ export default function Page() {
 
     function connect() {
       socket = new WebSocket(socketUrl)
-      socket.onopen = () => setConnected(true)
+      socket.onopen = () => {
+        setConnected(true)
+        void refreshAlarmHistory()
+      }
       socket.onclose = () => {
         if (disposed) return
         setConnected(false)
@@ -329,24 +405,56 @@ export default function Page() {
           const message = JSON.parse(event.data) as DeviceEvent
           if (message.eventName === 'alarm') {
             const alarm = message.message
+            const alarmId = alarm?.alarmId
             const code = alarm?.code
             const severity = alarm?.severity
             const text = alarm?.text
-            if (!message.deviceId || !message.deviceType || !code || !severity || !text) {
+            if (!alarmId || !message.deviceId || !message.deviceType || !code || !severity || !text) {
               console.error('Ignoring malformed alarm event', message)
               return
             }
 
-            const timestamp = alarm.timestamp ?? message.timestamp
-            setAlarms((current) => [{
-              id: `${message.deviceId}-${code}-${timestamp}-${Math.random().toString(36).slice(2)}`,
+            setAlarms((current) => mergeAlarms(current, [{
+              alarmId,
               deviceId: message.deviceId,
               deviceType: message.deviceType,
               code,
               severity,
               text,
-              timestamp,
-            }, ...current].slice(0, 5))
+              timestamp: alarm.timestamp ?? message.timestamp,
+              isActive: alarm.isActive ?? true,
+              acknowledgedByOperatorId: alarm.acknowledgedByOperatorId ?? null,
+              acknowledgedByOperator: alarm.acknowledgedByOperator ?? null,
+              acknowledgedAtUtc: alarm.acknowledgedAtUtc ?? null,
+            }]))
+            return
+          }
+
+          if (message.eventName === 'alarmAcknowledged') {
+            const alarm = message.message
+            const alarmId = alarm?.alarmId
+            const deviceId = message.deviceId
+            const deviceType = message.deviceType
+            const code = alarm?.code
+            const severity = alarm?.severity
+            const text = alarm?.text
+            if (!alarmId || !deviceId || !deviceType || !code || !severity || !text) {
+              console.error('Ignoring malformed alarm acknowledgement event', message)
+              return
+            }
+            setAlarms((current) => mergeAlarms(current, [{
+              alarmId,
+              deviceId,
+              deviceType,
+              code,
+              severity,
+              text,
+              timestamp: alarm.timestamp ?? message.timestamp,
+              isActive: alarm.isActive ?? true,
+              acknowledgedByOperatorId: alarm.acknowledgedByOperatorId ?? null,
+              acknowledgedByOperator: alarm.acknowledgedByOperator ?? null,
+              acknowledgedAtUtc: alarm.acknowledgedAtUtc ?? null,
+            }]))
             return
           }
 
@@ -378,10 +486,47 @@ export default function Page() {
       socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null
       socket.close()
     }
-  }, [receiveResult])
+  }, [receiveResult, refreshAlarmHistory])
 
   const selected = devices.find((device) => device.id === selectedId) ?? devices[0]
 
+  const visibleAlarms = alarms.filter((alarm) => !locallyDismissedAlarmIds.has(alarm.alarmId))
+  const locallyDismissedAlarms = alarms.filter((alarm) => locallyDismissedAlarmIds.has(alarm.alarmId))
+
+  async function acknowledgeAlarm(alarm: AlarmEvent) {
+    setAcknowledgingAlarmIds((current) => new Set(current).add(alarm.alarmId))
+    setAlarmError('')
+    try {
+      const response = await sessionFetch('/alarms/acknowledgements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alarmId: alarm.alarmId, deviceId: alarm.deviceId }),
+      })
+      if (!response.ok) {
+        const problem = await response.json().catch(() => null) as { detail?: string; title?: string } | null
+        throw new Error(problem?.detail ?? problem?.title ?? `Acknowledgement failed: ${response.status}`)
+      }
+
+      const acknowledgement = await response.json() as AlarmAcknowledgement
+      setAlarms((current) => current.map((item) => item.alarmId === acknowledgement.alarmId
+        ? {
+          ...item,
+          acknowledgedByOperatorId: acknowledgement.operatorId,
+          acknowledgedByOperator: acknowledgement.operatorName,
+          acknowledgedAtUtc: acknowledgement.acknowledgedAtUtc,
+        }
+        : item))
+    } catch (error) {
+      console.error('Could not acknowledge alarm', error)
+      setAlarmError(error instanceof Error ? error.message : 'Alarm acknowledgement failed.')
+    } finally {
+      setAcknowledgingAlarmIds((current) => {
+        const next = new Set(current)
+        next.delete(alarm.alarmId)
+        return next
+      })
+    }
+  }
 
   function handleCreated(device: CreatedDevice) {
     const nextDevice = createDeviceFromRegistration(device)
@@ -458,23 +603,76 @@ export default function Page() {
         <section id="alarms" tabIndex={-1} className="info-panel">
           <div className="panel-title">
             <h2><AlertTriangle size={20} /> Recent alarms</h2>
+            <span className="alarm-counts">
+              {alarms.filter((alarm) => alarm.isActive && !alarm.acknowledgedAtUtc).length} active · {alarms.filter((alarm) => !!alarm.acknowledgedAtUtc).length} acknowledged · {locallyDismissedAlarms.length} dismissed locally
+            </span>
           </div>
-          {alarms.length === 0 ? (
-            <p className="alarm-empty">{connected ? 'No alarms received in this session.' : 'No recent alarms to display. Live monitoring is disconnected.'}</p>
-          ) : <ul className="alarm-list">{alarms.map((alarm) => (
-            <li className="alarm-row" key={alarm.id} data-severity={alarm.severity.trim().toLowerCase()}>
+          {alarmError && <p className="alarm-error" role="alert">{alarmError}</p>}
+          {visibleAlarms.length === 0 ? (
+            <p className="alarm-empty">{alarms.length === 0 ? (connected ? 'No recent alarms.' : 'No recent alarms to display. Live monitoring is disconnected.') : 'All recent alarms were dismissed locally.'}</p>
+          ) : <ul className="alarm-list">{visibleAlarms.map((alarm) => (
+            <li className="alarm-row" key={alarm.alarmId} data-severity={alarm.severity.trim().toLowerCase()}>
               <AlertTriangle className="alarm-icon" size={19} aria-hidden="true" />
               <div className="alarm-details">
                 <div className="alarm-heading">
                   <b>{devices.find((device) => device.id === alarm.deviceId)?.name || alarm.deviceId}</b>
                   <span className="alarm-severity">{alarm.severity}</span>
+                  <span className={`alarm-state ${alarm.acknowledgedAtUtc ? 'acknowledged' : alarm.isActive ? 'active' : ''}`}>
+                    {alarm.acknowledgedAtUtc ? `Acknowledged by ${alarm.acknowledgedByOperator ?? alarm.acknowledgedByOperatorId}` : alarm.isActive ? 'Active' : 'Cleared'}
+                  </span>
                 </div>
                 <span className="alarm-message">{alarm.text} ({alarm.code})</span>
               </div>
               <time dateTime={alarm.timestamp}>{new Date(alarm.timestamp).toLocaleTimeString()}</time>
-              <button onClick={() => setAlarms((current) => current.filter((item) => item.id !== alarm.id))} className="ack" aria-label={`Dismiss ${alarm.code} for ${alarm.deviceId}`}>Dismiss</button>
+              <div className="alarm-actions">
+                {!alarm.acknowledgedAtUtc && canOperate && <button
+                  disabled={acknowledgingAlarmIds.has(alarm.alarmId)}
+                  onClick={() => void acknowledgeAlarm(alarm)}
+                  className="ack"
+                  aria-label={`Acknowledge ${alarm.code} for ${alarm.deviceId}`}
+                >{acknowledgingAlarmIds.has(alarm.alarmId) ? 'Acknowledging…' : 'Acknowledge'}</button>}
+                <button
+                  onClick={() => setLocallyDismissedAlarmIds((current) => new Set(current).add(alarm.alarmId))}
+                  className="ack"
+                  aria-label={`Dismiss ${alarm.code} locally for ${alarm.deviceId}`}
+                >Dismiss locally</button>
+              </div>
             </li>
           ))}</ul>}
+          {locallyDismissedAlarms.length > 0 && <details className="locally-dismissed">
+            <summary>Locally dismissed alarms (not acknowledged)</summary>
+            <ul className="alarm-list">{locallyDismissedAlarms.map((alarm) => (
+              <li className="alarm-row" key={alarm.alarmId}>
+                <AlertTriangle className="alarm-icon" size={19} aria-hidden="true" />
+                <div className="alarm-details">
+                  <div className="alarm-heading">
+                    <b>{devices.find((device) => device.id === alarm.deviceId)?.name || alarm.deviceId}</b>
+                    <span className="alarm-state locally-dismissed-state">Dismissed locally</span>
+                    {alarm.acknowledgedAtUtc && <span className="alarm-state acknowledged">Acknowledged by {alarm.acknowledgedByOperator ?? alarm.acknowledgedByOperatorId}</span>}
+                  </div>
+                  <span className="alarm-message">{alarm.text} ({alarm.code})</span>
+                </div>
+                <time dateTime={alarm.timestamp}>{new Date(alarm.timestamp).toLocaleTimeString()}</time>
+                <div className="alarm-actions">
+                  {!alarm.acknowledgedAtUtc && canOperate && <button
+                    disabled={acknowledgingAlarmIds.has(alarm.alarmId)}
+                    onClick={() => void acknowledgeAlarm(alarm)}
+                    className="ack"
+                    aria-label={`Acknowledge ${alarm.code} for ${alarm.deviceId}`}
+                  >{acknowledgingAlarmIds.has(alarm.alarmId) ? 'Acknowledging…' : 'Acknowledge'}</button>}
+                  <button
+                    onClick={() => setLocallyDismissedAlarmIds((current) => {
+                      const next = new Set(current)
+                      next.delete(alarm.alarmId)
+                      return next
+                    })}
+                    className="ack"
+                    aria-label={`Restore ${alarm.code} for ${alarm.deviceId}`}
+                  >Restore</button>
+                </div>
+              </li>
+            ))}</ul>
+          </details>}
         </section>
       </div>
     </section>

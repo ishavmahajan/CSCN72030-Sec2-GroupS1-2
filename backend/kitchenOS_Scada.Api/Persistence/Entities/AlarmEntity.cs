@@ -19,4 +19,8 @@ public sealed class AlarmEntity
     public bool IsActive { get; set; } = true;
 
     public EventTypeEntity EventType { get; set; } = null!;
+
+    public DeviceEntity Device { get; set; } = null!;
+
+    public AlarmAcknowledgementEntity? Acknowledgement { get; set; }
 }
