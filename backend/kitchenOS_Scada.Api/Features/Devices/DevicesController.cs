@@ -61,11 +61,20 @@ public sealed class DevicesController : ControllerBase
     [ProducesResponseType<DeviceInventoryResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public Task<ActionResult<DeviceInventoryResponse>> GetDevice(
+    public async Task<ActionResult<DeviceInventoryResponse>> GetDevice(
         string deviceId,
         CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            return BadRequest(new { error = "Device ID is required." });
+        }
+
+        DeviceInventoryResponse? device = await _queryService.GetByIdAsync(
+            deviceId,
+            cancellationToken);
+
+        return device is null ? NotFound() : Ok(device);
     }
 
     /// <summary>Registers a device in the persisted inventory.</summary>
@@ -75,11 +84,32 @@ public sealed class DevicesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public Task<ActionResult<DeviceInventoryResponse>> RegisterDevice(
-        RegisterDeviceRequest request,
+    public async Task<ActionResult<DeviceInventoryResponse>> RegisterDevice(
+        RegisterDeviceRequest? request,
         CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        if (request is null)
+        {
+            return BadRequest(new { error = "A device registration request is required." });
+        }
+
+        DeviceOperationResult<DeviceInventoryResponse> result =
+            await _registrationService.RegisterAsync(request, cancellationToken);
+
+        return result.Error switch
+        {
+            DeviceOperationError.None => CreatedAtAction(
+                nameof(GetDevice),
+                new { deviceId = result.Value!.DeviceId },
+                result.Value),
+            DeviceOperationError.Duplicate => Conflict(new { error = result.ErrorMessage }),
+            DeviceOperationError.InvalidDeviceType or DeviceOperationError.ValidationFailed =>
+                BadRequest(new { error = result.ErrorMessage }),
+            DeviceOperationError.EventPublicationFailed => Problem(
+                result.ErrorMessage,
+                statusCode: StatusCodes.Status503ServiceUnavailable),
+            _ => Problem("An error occurred while registering the device.")
+        };
     }
 
     /// <summary>Removes a device from the active persisted inventory.</summary>
