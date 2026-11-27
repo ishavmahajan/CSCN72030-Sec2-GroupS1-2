@@ -64,7 +64,42 @@ public sealed class DeviceRepository(KitchenOsDbContext dbContext) : IDeviceRepo
         }
 
         device.DeviceType = deviceType;
+        device.DeviceId = await GenerateDeviceIdAsync(
+            deviceType.Name,
+            cancellationToken);
         await _dbContext.Devices.AddAsync(device, cancellationToken);
+    }
+
+    private async Task<string> GenerateDeviceIdAsync(
+        string deviceType,
+        CancellationToken cancellationToken)
+    {
+        string prefix = deviceType switch
+        {
+            "WALK_IN_FREEZER" => "FRZ",
+            "STOVE" => "STV",
+            "OVEN" => "OVN",
+            "MIXER" => "MIX",
+            "EXHAUST_FAN" => "FAN",
+            "BLENDER" => "BLD",
+            "DISHWASHER" => "DSH",
+            "SINK" => "SNK",
+            _ => throw new ArgumentOutOfRangeException(nameof(deviceType), deviceType,
+                "The device type is not supported by the simulator.")
+        };
+
+        List<string> existingIds = await _dbContext.Devices
+            .AsNoTracking()
+            .Where(candidate => candidate.DeviceId.StartsWith(prefix + "-"))
+            .Select(candidate => candidate.DeviceId)
+            .ToListAsync(cancellationToken);
+
+        int nextNumber = existingIds
+            .Select(id => int.TryParse(id[(prefix.Length + 1)..], out int number) ? number : 0)
+            .DefaultIfEmpty()
+            .Max() + 1;
+
+        return $"{prefix}-{nextNumber:000}";
     }
 
     public Task<bool> DeactivateAsync(

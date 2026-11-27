@@ -19,31 +19,23 @@ public sealed class DeviceRegistrationService(
         RegisterDeviceRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.DeviceId) ||
-            string.IsNullOrWhiteSpace(request.DeviceName))
+        if (string.IsNullOrWhiteSpace(request.DeviceName))
         {
             return new(null, DeviceOperationError.ValidationFailed,
-                "Device ID and device name are required.");
+                "Device name is required.");
         }
 
-        if (request.DeviceId.Length > 100 || request.DeviceName.Length > 200 ||
+        if (request.DeviceName.Length > 200 ||
             request.Description?.Length > 1000)
         {
             return new(null, DeviceOperationError.ValidationFailed,
-                "The device ID, name, or description exceeds its maximum length.");
-        }
-
-        string deviceId = request.DeviceId.Trim();
-        if (await _repository.ExistsAsync(deviceId, cancellationToken))
-        {
-            return new(null, DeviceOperationError.Duplicate,
-                $"Device '{deviceId}' already exists.");
+                "The device name or description exceeds its maximum length.");
         }
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         DeviceEntity device = new()
         {
-            DeviceId = deviceId,
+            DeviceId = string.Empty,
             DeviceName = request.DeviceName.Trim(),
             DeviceTypeId = request.DeviceTypeId,
             Description = request.Description?.Trim() ?? string.Empty,

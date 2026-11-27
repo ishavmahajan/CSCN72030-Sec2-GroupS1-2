@@ -103,9 +103,15 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
 .info-panel { margin-top: 16px; }
 .alarm-list { padding: 0; margin: 0; list-style: none; }
 .alarm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 13px; }
-.alarm-row .danger { color: #ff9288; }
+.alarm-row { --severity-text: #d4dae2; --severity-bg: #2d3035; }
+.alarm-row[data-severity="info"] { --severity-text: #afd4ff; --severity-bg: #20344b; }
+.alarm-row[data-severity="warning"] { --severity-text: #ffd28a; --severity-bg: #422e17; }
+.alarm-row[data-severity="critical"] { --severity-text: #ffb0a7; --severity-bg: #482320; }
+.alarm-icon { color: var(--severity-text); }
 .alarm-details { overflow-wrap: anywhere; }
-.alarm-details span { display: block; color: var(--muted); }
+.alarm-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.alarm-severity { padding: 2px 7px; border-radius: 5px; background: var(--severity-bg); color: var(--severity-text); font-size: 12px; font-weight: 700; text-transform: capitalize; }
+.alarm-message { display: block; margin-top: 3px; color: var(--muted); }
 .alarm-row time { color: var(--muted); white-space: nowrap; }
 .spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

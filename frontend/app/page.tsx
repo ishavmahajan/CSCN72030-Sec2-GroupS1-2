@@ -462,9 +462,15 @@ export default function Page() {
           {alarms.length === 0 ? (
             <p className="alarm-empty">{connected ? 'No alarms received in this session.' : 'No recent alarms to display. Live monitoring is disconnected.'}</p>
           ) : <ul className="alarm-list">{alarms.map((alarm) => (
-            <li className="alarm-row" key={alarm.id}>
-              <AlertTriangle className="danger" size={19} aria-hidden="true" />
-              <div className="alarm-details"><b>{devices.find((device) => device.id === alarm.deviceId)?.name || alarm.deviceId}</b><span>{alarm.text} ({alarm.code}) · {alarm.severity}</span></div>
+            <li className="alarm-row" key={alarm.id} data-severity={alarm.severity.trim().toLowerCase()}>
+              <AlertTriangle className="alarm-icon" size={19} aria-hidden="true" />
+              <div className="alarm-details">
+                <div className="alarm-heading">
+                  <b>{devices.find((device) => device.id === alarm.deviceId)?.name || alarm.deviceId}</b>
+                  <span className="alarm-severity">{alarm.severity}</span>
+                </div>
+                <span className="alarm-message">{alarm.text} ({alarm.code})</span>
+              </div>
               <time dateTime={alarm.timestamp}>{new Date(alarm.timestamp).toLocaleTimeString()}</time>
               <button onClick={() => setAlarms((current) => current.filter((item) => item.id !== alarm.id))} className="ack" aria-label={`Dismiss ${alarm.code} for ${alarm.deviceId}`}>Dismiss</button>
             </li>

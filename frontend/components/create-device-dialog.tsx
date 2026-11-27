@@ -32,7 +32,6 @@ type Props = {
 }
 
 export function CreateDeviceDialog({ open, onClose, onCreated }: Props) {
-  const [deviceId, setDeviceId] = useState('')
   const [deviceName, setDeviceName] = useState('')
   const [deviceTypeId, setDeviceTypeId] = useState('4')
   const [description, setDescription] = useState('')
@@ -59,8 +58,8 @@ export function CreateDeviceDialog({ open, onClose, onCreated }: Props) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!deviceId.trim() || !deviceName.trim()) {
-      setError('Enter a device ID and name.')
+    if (!deviceName.trim()) {
+      setError('Enter a device name.')
       return
     }
     setBusy(true)
@@ -71,7 +70,6 @@ export function CreateDeviceDialog({ open, onClose, onCreated }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deviceId: deviceId.trim(),
           deviceName: deviceName.trim(),
           deviceTypeId: Number(deviceTypeId),
           description: description.trim() || null,
@@ -85,7 +83,6 @@ export function CreateDeviceDialog({ open, onClose, onCreated }: Props) {
 
       if (!body || !('deviceId' in body)) throw new Error('The API response did not include the created device.')
       onCreated(body)
-      setDeviceId('')
       setDeviceName('')
       setDeviceTypeId('4')
       setDescription('')
@@ -106,10 +103,7 @@ export function CreateDeviceDialog({ open, onClose, onCreated }: Props) {
       </div>
       <p id="create-device-description" className="modal-description">Register equipment to add it to the monitoring dashboard.</p>
       <form onSubmit={submit} aria-busy={busy}>
-        <div className="modal-form-grid">
-          <label className="modal-field"><span>Device ID</span><input required readOnly={busy} maxLength={100} value={deviceId} onChange={(event) => setDeviceId(event.target.value)} placeholder="e.g. MIX-003" ref={firstField} /></label>
-          <label className="modal-field"><span>Device name</span><input required readOnly={busy} maxLength={200} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} placeholder="e.g. Prep mixer 3" /></label>
-        </div>
+        <label className="modal-field"><span>Device name</span><input required readOnly={busy} maxLength={200} value={deviceName} onChange={(event) => setDeviceName(event.target.value)} placeholder="e.g. Prep mixer 3" ref={firstField} /></label>
         <fieldset className="device-type-picker" disabled={busy}><legend>Device type</legend><div className="device-type-grid">{deviceTypes.map((type) => { const Icon: LucideIcon = type.icon; const selected = deviceTypeId === String(type.id); return <button key={type.id} type="button" className={`device-type-option ${selected ? 'selected' : ''} ${type.color}`} aria-pressed={selected} onClick={() => setDeviceTypeId(String(type.id))}><span className="device-type-option-icon"><Icon size={19} /></span><span>{type.label}</span>{selected && <span className="device-type-check">✓</span>}</button> })}</div></fieldset>
         <label className="modal-field"><span>Description <small>(optional)</small></span><input readOnly={busy} maxLength={1000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Where this equipment is used" /></label>
         {error && <p className="modal-error" role="alert">{error}</p>}
