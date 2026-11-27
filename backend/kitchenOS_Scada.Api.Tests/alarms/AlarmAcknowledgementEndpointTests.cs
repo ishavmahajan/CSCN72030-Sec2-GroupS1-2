@@ -149,6 +149,42 @@ public sealed class AlarmAcknowledgementEndpointTests
     }
 
     [TestMethod]
+    public async Task Acknowledge_UpdatesAllExistingOccurrencesForOnlyTheMatchingDeviceAndCode()
+    {
+        IAlarmAcknowledgementService service = _app.Services.GetRequiredService<IAlarmAcknowledgementService>();
+
+        Task RecordAsync(string deviceId, DeviceTypes deviceType, string code) => service.RecordAlarmAsync(
+            new EventEnvelope
+            {
+                DeviceId = deviceId,
+                DeviceType = deviceType,
+                Timestamp = DateTimeOffset.UtcNow.ToString("O"),
+                Message = new AlarmBody { Code = code, Severity = "critical", Text = "Test occurrence" }
+            },
+            CancellationToken.None);
+
+        await RecordAsync("MIX-001", DeviceTypes.Mixer, "MIXER_OVERHEAT");
+        await RecordAsync("MIX-001", DeviceTypes.Mixer, "UNRELATED");
+        await RecordAsync("OVN-001", DeviceTypes.Oven, "MIXER_OVERHEAT");
+        _socket = new RecordingSocket();
+        _socketId = _notifier.AddClient(_socket);
+
+        using HttpResponseMessage response = await PostAcknowledgementAsync(_alarmId, "MIX-001");
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.AreEqual(2, _socket.Messages.Count);
+        await RecordAsync("MIX-001", DeviceTypes.Mixer, "MIXER_OVERHEAT");
+
+        using HttpResponseMessage listResponse = await _client.GetAsync("/alarms");
+        AlarmStatusResponse[] alarms = (await listResponse.Content.ReadFromJsonAsync<AlarmStatusResponse[]>())!;
+        AlarmStatusResponse[] acknowledged = alarms.Where(item => item.AcknowledgedAtUtc is not null).ToArray();
+        Assert.AreEqual(5, alarms.Length);
+        Assert.AreEqual(2, acknowledged.Length);
+        Assert.IsTrue(acknowledged.All(item => item.DeviceId == "MIX-001" && item.Code == "MIXER_OVERHEAT"));
+        Assert.AreEqual(acknowledged[0].AcknowledgedAtUtc, acknowledged[1].AcknowledgedAtUtc);
+        Assert.IsNull(alarms[0].AcknowledgedAtUtc);
+    }
+
+    [TestMethod]
     public async Task Acknowledge_UnknownAlarmReturnsNotFound()
     {
         using HttpResponseMessage response = await PostAcknowledgementAsync(long.MaxValue, "MIX-001");
@@ -159,7 +195,7 @@ public sealed class AlarmAcknowledgementEndpointTests
     }
 
     [TestMethod]
-    public async Task AlarmFeed_PersistsAndBroadcastsNewAlarmIdsAndKeepsLatestFive()
+    public async Task AlarmFeed_PersistsAndBroadcastsNewAlarmIdsAndKeepsOlderAlarms()
     {
         _socket = new RecordingSocket();
         _socketId = _notifier.AddClient(_socket);
@@ -187,7 +223,8 @@ public sealed class AlarmAcknowledgementEndpointTests
 
         using HttpResponseMessage response = await _client.GetAsync("/alarms");
         AlarmStatusResponse[] alarms = (await response.Content.ReadFromJsonAsync<AlarmStatusResponse[]>())!;
-        Assert.AreEqual(5, alarms.Length);
+        Assert.AreEqual(7, alarms.Length);
+        Assert.AreEqual(_alarmId, alarms[^1].AlarmId);
         Assert.AreEqual("MIXER_ALARM_5", alarms[0].Code);
         Assert.AreEqual(6, _socket.Messages.Count);
         using JsonDocument firstNotification = JsonDocument.Parse(_socket.Messages[0]);

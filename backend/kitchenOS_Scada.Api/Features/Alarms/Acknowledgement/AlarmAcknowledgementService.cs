@@ -22,11 +22,9 @@ public sealed class AlarmAcknowledgementService(
 
         List<AlarmEntity> alarms = await dbContext.Alarms
             .AsNoTracking()
-            .Include(alarm => alarm.Acknowledgement)
             .Include(alarm => alarm.Device)
                 .ThenInclude(device => device!.DeviceType)
             .OrderByDescending(alarm => alarm.AlarmId)
-            .Take(5)
             .ToListAsync(cancellationToken);
 
         return alarms.Select(ToStatusResponse).ToArray();
@@ -51,9 +49,7 @@ public sealed class AlarmAcknowledgementService(
             await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         AlarmEntity? alarm = await dbContext.Alarms
-            .Include(item => item.Acknowledgement)
-            .Include(item => item.Device)
-                .ThenInclude(device => device!.DeviceType)
+            .AsNoTracking()
             .SingleOrDefaultAsync(item => item.AlarmId == request.AlarmId, cancellationToken);
 
         if (alarm is null)
@@ -66,49 +62,50 @@ public sealed class AlarmAcknowledgementService(
             return new(AlarmAcknowledgementResultStatus.DeviceMismatch, null);
         }
 
-        if (alarm.Acknowledgement is not null)
-        {
-            return new(
-                AlarmAcknowledgementResultStatus.AlreadyAcknowledged,
-                ToAcknowledgementResponse(alarm.Acknowledgement, alreadyAcknowledged: true));
-        }
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset acknowledgedAtUtc = now.AddTicks(-(now.Ticks % TimeSpan.TicksPerMicrosecond));
+        IQueryable<AlarmEntity> matchingAlarms = dbContext.Alarms
+            .Where(item => item.DeviceId == alarm.DeviceId && item.Code == alarm.Code);
 
-        AlarmAcknowledgementEntity acknowledgement = new()
-        {
-            AlarmId = alarm.AlarmId,
-            DeviceId = alarm.DeviceId,
-            OperatorId = operatorId,
-            OperatorName = operatorName,
-            AcknowledgedAtUtc = DateTimeOffset.UtcNow
-        };
-        dbContext.AlarmAcknowledgements.Add(acknowledgement);
+        // Preserve earlier acknowledgements and update the matching occurrences in one statement.
+        int updated = await matchingAlarms
+            .Where(item => item.AcknowledgedAtUtc == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.AcknowledgedByOperatorId, operatorId)
+                .SetProperty(item => item.AcknowledgedByOperator, operatorName)
+                .SetProperty(item => item.AcknowledgedAtUtc, acknowledgedAtUtc),
+                cancellationToken);
 
-        try
+        AlarmEntity? selected = await dbContext.Alarms
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.AlarmId == request.AlarmId, cancellationToken);
+
+        if (updated > 0)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException)
-        {
-            await using KitchenOsDbContext retryContext =
-                await dbContextFactory.CreateDbContextAsync(cancellationToken);
-            AlarmAcknowledgementEntity? existing = await retryContext.AlarmAcknowledgements
+            List<AlarmEntity> acknowledgements = await matchingAlarms
                 .AsNoTracking()
-                .SingleOrDefaultAsync(item => item.AlarmId == alarm.AlarmId, cancellationToken);
-            if (existing is null)
-            {
-                throw;
-            }
+                .Where(item => item.AcknowledgedAtUtc == acknowledgedAtUtc && item.AcknowledgedByOperatorId == operatorId)
+                .Include(item => item.Device)
+                    .ThenInclude(device => device!.DeviceType)
+                .ToListAsync(cancellationToken);
 
-            return new(
-                AlarmAcknowledgementResultStatus.AlreadyAcknowledged,
-                ToAcknowledgementResponse(existing, alreadyAcknowledged: true));
+            foreach (AlarmEntity acknowledgement in acknowledgements)
+            {
+                await clientNotifier.Notify(CreateAcknowledgedEvent(acknowledgement), cancellationToken);
+            }
         }
 
-        AlarmAcknowledgementResponse response =
-            ToAcknowledgementResponse(acknowledgement, alreadyAcknowledged: false);
-        await clientNotifier.Notify(CreateAcknowledgedEvent(alarm, acknowledgement), cancellationToken);
+        if (selected is null)
+        {
+            return new(AlarmAcknowledgementResultStatus.NotFound, null);
+        }
 
-        return new(AlarmAcknowledgementResultStatus.Acknowledged, response);
+        bool alreadyAcknowledged = updated == 0
+            || selected.AcknowledgedAtUtc != acknowledgedAtUtc
+            || selected.AcknowledgedByOperatorId != operatorId;
+        return new(
+            updated > 0 ? AlarmAcknowledgementResultStatus.Acknowledged : AlarmAcknowledgementResultStatus.AlreadyAcknowledged,
+            ToAcknowledgementResponse(selected, alreadyAcknowledged));
     }
 
     public async Task RecordAlarmAsync(
@@ -162,41 +159,37 @@ public sealed class AlarmAcknowledgementService(
             alarm.Text,
             alarm.OccurredAtUtc,
             alarm.IsActive,
-            alarm.Acknowledgement?.OperatorId,
-            alarm.Acknowledgement?.OperatorName,
-            alarm.Acknowledgement?.AcknowledgedAtUtc);
+            alarm.AcknowledgedByOperatorId,
+            alarm.AcknowledgedByOperator,
+            alarm.AcknowledgedAtUtc);
     }
 
     private static AlarmAcknowledgementResponse ToAcknowledgementResponse(
-        AlarmAcknowledgementEntity acknowledgement,
+        AlarmEntity alarm,
         bool alreadyAcknowledged)
     {
         return new AlarmAcknowledgementResponse(
-            acknowledgement.AlarmId,
-            acknowledgement.DeviceId,
-            acknowledgement.OperatorId,
-            acknowledgement.OperatorName,
-            acknowledgement.AcknowledgedAtUtc,
+            alarm.AlarmId,
+            alarm.DeviceId,
+            alarm.AcknowledgedByOperatorId!,
+            alarm.AcknowledgedByOperator!,
+            alarm.AcknowledgedAtUtc!.Value,
             alreadyAcknowledged);
     }
 
-    private static EventEnvelope CreateAcknowledgedEvent(
-        AlarmEntity alarm,
-        AlarmAcknowledgementEntity acknowledgement)
+    private static EventEnvelope CreateAcknowledgedEvent(AlarmEntity alarm)
     {
         return new EventEnvelope
         {
             EventName = "alarmAcknowledged",
             DeviceId = alarm.DeviceId,
             DeviceType = DeviceTypeExtensions.FromFriendlyString(alarm.Device!.DeviceType.Name),
-            Timestamp = acknowledgement.AcknowledgedAtUtc.ToString("O", CultureInfo.InvariantCulture),
-            Message = CreateNotificationMessage(alarm, acknowledgement)
+            Timestamp = alarm.AcknowledgedAtUtc!.Value.ToString("O", CultureInfo.InvariantCulture),
+            Message = CreateNotificationMessage(alarm)
         };
     }
 
-    private static AlarmBody CreateNotificationMessage(
-        AlarmEntity alarm,
-        AlarmAcknowledgementEntity? acknowledgement = null)
+    private static AlarmBody CreateNotificationMessage(AlarmEntity alarm)
     {
         return new AlarmBody
         {
@@ -206,9 +199,9 @@ public sealed class AlarmAcknowledgementService(
             Text = alarm.Text,
             Timestamp = alarm.OccurredAtUtc.UtcDateTime,
             IsActive = alarm.IsActive,
-            AcknowledgedByOperatorId = acknowledgement?.OperatorId,
-            AcknowledgedByOperator = acknowledgement?.OperatorName,
-            AcknowledgedAtUtc = acknowledgement?.AcknowledgedAtUtc
+            AcknowledgedByOperatorId = alarm.AcknowledgedByOperatorId,
+            AcknowledgedByOperator = alarm.AcknowledgedByOperator,
+            AcknowledgedAtUtc = alarm.AcknowledgedAtUtc
         };
     }
 

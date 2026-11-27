@@ -13,7 +13,7 @@ namespace kitchenOS_Scada.Api.Features.Alarms;
 public sealed class AlarmAcknowledgementController(
     IAlarmAcknowledgementService alarmAcknowledgementService) : ControllerBase
 {
-    /// <summary>Returns the five most recent persisted alarms.</summary>
+    /// <summary>Returns persisted alarms, newest first.</summary>
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<AlarmStatusResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<AlarmStatusResponse>>> GetRecent(
@@ -24,7 +24,7 @@ public sealed class AlarmAcknowledgementController(
         return Ok(alarms);
     }
 
-    /// <summary>Acknowledges an alarm on behalf of the authenticated operator.</summary>
+    /// <summary>Acknowledges existing occurrences of the selected alarm code for that device on behalf of the authenticated operator.</summary>
     [HttpPost("acknowledgements")]
     [Authorize(Policy = AuthorizationPolicies.Operate)]
     [ProducesResponseType<AlarmAcknowledgementResponse>(StatusCodes.Status200OK)]

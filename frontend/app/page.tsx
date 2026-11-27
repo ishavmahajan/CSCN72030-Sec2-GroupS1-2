@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Bell, ClipboardList, ChevronRight, Fan, Gauge, Layers3, LayoutGrid, Menu, Plus, Snowflake, Square, Utensils, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
+import { Activity, AlertTriangle, Bell, ClipboardList, ChevronRight, Fan, Gauge, Layers3, LayoutGrid, Menu, Plus, Snowflake, Square, Utensils, Volume2, VolumeX, Waves, Wifi, WifiOff, X, Zap, type LucideIcon } from 'lucide-react'
 import { DeviceCommandControls, type DevicePoint } from '../components/device-command-controls'
 import { CommandToasts } from '../components/command-toasts'
 import { CreateDeviceDialog, type CreatedDevice } from '../components/create-device-dialog'
 import { useSession } from '../components/auth-gate'
 import { apiUrl, sessionFetch } from '../lib/auth-api'
 import { capabilityProvider, type CommandRequest, type DeviceProfile } from '../lib/device-capabilities'
+import { useAlarmSound } from '../lib/use-alarm-sound'
 import { useDeviceCommands, type CommandResult } from '../lib/use-device-commands'
 
 type Device = {
@@ -78,6 +79,10 @@ type DeviceEvent = {
   }
 }
 
+function alarmGroupKey(alarm: AlarmEvent) {
+  return JSON.stringify([alarm.deviceId, alarm.code])
+}
+
 function mergeAlarm(current: AlarmEvent | undefined, incoming: AlarmEvent): AlarmEvent {
   if (!current) return incoming
   return {
@@ -94,7 +99,18 @@ function mergeAlarms(current: AlarmEvent[], incoming: AlarmEvent[]): AlarmEvent[
   for (const alarm of incoming) alarms.set(alarm.alarmId, mergeAlarm(alarms.get(alarm.alarmId), alarm))
   return [...alarms.values()]
     .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
-    .slice(0, 5)
+}
+
+function getAlarmTableRows(alarms: AlarmEvent[]) {
+  const unacknowledged = new Map<string, AlarmEvent>()
+  // Keep the earliest active occurrence so repeated events leave its row in place.
+  for (const alarm of alarms.toReversed()) {
+    if (alarm.acknowledgedAtUtc) continue
+    const key = alarmGroupKey(alarm)
+    const existing = unacknowledged.get(key)
+    if (!existing || (alarm.isActive && !existing.isActive)) unacknowledged.set(key, alarm)
+  }
+  return alarms.filter((alarm) => alarm.acknowledgedAtUtc || unacknowledged.get(alarmGroupKey(alarm)) === alarm)
 }
 
 const deviceMetadata: Record<string, { icon: LucideIcon; color: string; type: string }> = {
@@ -244,7 +260,14 @@ function OperatingState({ running, connected }: { running: boolean | undefined; 
   </span>
 }
 
-function DeviceCard({ device, selected, running, connected, onSelect }: { device: Device; selected: boolean; running: boolean | undefined; connected: boolean; onSelect: () => void }) {
+function DeviceCard({ device, selected, running, connected, hasCriticalAlarm, onSelect }: {
+  device: Device
+  selected: boolean
+  running: boolean | undefined
+  connected: boolean
+  hasCriticalAlarm: boolean
+  onSelect: () => void
+}) {
   const Icon = device.icon
   const unit = device.unit === 'C' ? '°C' : device.unit
   return <button aria-pressed={selected} className={`device-card ${selected ? 'selected' : ''} ${!connected ? 'disconnected' : ''}`} onClick={onSelect}>
@@ -259,6 +282,10 @@ function DeviceCard({ device, selected, running, connected, onSelect }: { device
     </span>
     <span className="device-card-foot">
       <OperatingState running={running} connected={connected} />
+      {hasCriticalAlarm && <span className="device-critical-alarm" title="Unacknowledged critical alarm">
+        <AlertTriangle size={16} aria-hidden="true" />
+        <span className="sr-only">Unacknowledged critical alarm</span>
+      </span>}
     </span>
   </button>
 }
@@ -304,7 +331,8 @@ export default function Page() {
     setDevices((current) => current.map((device) =>
       device.id === deviceId ? applyAcknowledgedCommand(device, request) : device))
   }, [])
-  const { pendingDevices, toasts, dismissToast, receiveResult, submit } = useDeviceCommands(apiUrl, applyAcknowledgement)
+  const { soundEnabled, soundError, toggleAlarmSound, playAlarmSound } = useAlarmSound()
+  const { pendingDevices, toasts, dismissToast, dismissAllToasts, showToast, receiveResult, submit } = useDeviceCommands(apiUrl, applyAcknowledgement)
   const [connected, setConnected] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuButton = useRef<HTMLButtonElement>(null)
@@ -312,8 +340,14 @@ export default function Page() {
   const [inventoryStatus, setInventoryStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [inventoryAttempt, setInventoryAttempt] = useState(0)
   const [alarms, setAlarms] = useState<AlarmEvent[]>([])
+  const [alarmPage, setAlarmPage] = useState(1)
+  const [alarmFilter, setAlarmFilter] = useState<'all' | 'unacknowledged' | 'acknowledged'>('all')
+  const [alarmDeviceFilter, setAlarmDeviceFilter] = useState('')
+  const [selectedAlarmIds, setSelectedAlarmIds] = useState<Set<number>>(() => new Set())
+  const [bulkAcknowledging, setBulkAcknowledging] = useState(false)
+  const [dismissedAlarmPage, setDismissedAlarmPage] = useState(1)
   const [locallyDismissedAlarmIds, setLocallyDismissedAlarmIds] = useState<Set<number>>(() => new Set())
-  const [acknowledgingAlarmIds, setAcknowledgingAlarmIds] = useState<Set<number>>(() => new Set())
+  const [acknowledgingAlarmGroups, setAcknowledgingAlarmGroups] = useState<Set<string>>(() => new Set())
   const [alarmError, setAlarmError] = useState('')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
@@ -414,6 +448,13 @@ export default function Page() {
               return
             }
 
+            const level = severity.trim().toLowerCase()
+            playAlarmSound(level)
+            showToast({
+              deviceName: `${severity.trim()} alarm · ${message.deviceId}`,
+              kind: level === 'critical' || level === 'warning' ? level : 'alarm',
+              text: `${text} (${code})`,
+            })
             setAlarms((current) => mergeAlarms(current, [{
               alarmId,
               deviceId: message.deviceId,
@@ -486,45 +527,98 @@ export default function Page() {
       socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null
       socket.close()
     }
-  }, [receiveResult, refreshAlarmHistory])
+  }, [receiveResult, refreshAlarmHistory, showToast, playAlarmSound])
 
   const selected = devices.find((device) => device.id === selectedId) ?? devices[0]
 
-  const visibleAlarms = alarms.filter((alarm) => !locallyDismissedAlarmIds.has(alarm.alarmId))
-  const locallyDismissedAlarms = alarms.filter((alarm) => locallyDismissedAlarmIds.has(alarm.alarmId))
+  const alarmTableRows = getAlarmTableRows(alarms)
+  const alarmDevices = new Map(devices.map((device) => [device.id, device.name]))
+  for (const alarm of alarms) {
+    if (!alarmDevices.has(alarm.deviceId)) alarmDevices.set(alarm.deviceId, alarm.deviceId)
+  }
+  const alarmDeviceOptions = [...alarmDevices].sort((left, right) => left[1].localeCompare(right[1], undefined, { numeric: true }))
+  const matchesAlarmFilters = (alarm: AlarmEvent) =>
+    (!alarmDeviceFilter || alarm.deviceId === alarmDeviceFilter)
+    && (alarmFilter === 'all' || !!alarm.acknowledgedAtUtc === (alarmFilter === 'acknowledged'))
+  const visibleAlarms = alarmTableRows.filter((alarm) => !locallyDismissedAlarmIds.has(alarm.alarmId))
+  const filteredAlarms = visibleAlarms.filter(matchesAlarmFilters)
+  const selectableAlarms = filteredAlarms.filter((alarm) => !alarm.acknowledgedAtUtc)
+  const selectedAlarms = selectableAlarms.filter((alarm) => selectedAlarmIds.has(alarm.alarmId))
+  const allAlarmsSelected = selectableAlarms.length > 0 && selectedAlarms.length === selectableAlarms.length
+  const criticalDeviceIds = new Set(alarms
+    .filter((alarm) => alarm.isActive && !alarm.acknowledgedAtUtc && alarm.severity.trim().toLowerCase() === 'critical')
+    .map((alarm) => alarm.deviceId))
+  const locallyDismissedAlarms = alarmTableRows.filter((alarm) => locallyDismissedAlarmIds.has(alarm.alarmId))
+  const filteredDismissedAlarms = locallyDismissedAlarms.filter(matchesAlarmFilters)
 
-  async function acknowledgeAlarm(alarm: AlarmEvent) {
-    setAcknowledgingAlarmIds((current) => new Set(current).add(alarm.alarmId))
+  function resetAlarmSelection() {
+    setAlarmPage(1)
+    setDismissedAlarmPage(1)
+    setSelectedAlarmIds(new Set())
+  }
+
+  async function acknowledgeAlarms(rows: AlarmEvent[], bulk = false) {
+    const pendingRows = rows.filter((alarm) => !acknowledgingAlarmGroups.has(alarmGroupKey(alarm)))
+    if (!canOperate || pendingRows.length === 0) return
+
+    const groups = pendingRows.map(alarmGroupKey)
+    setAcknowledgingAlarmGroups((current) => new Set([...current, ...groups]))
+    if (bulk) setBulkAcknowledging(true)
     setAlarmError('')
+    const succeeded = new Set<number>()
+    let firstError = ''
+
     try {
-      const response = await sessionFetch('/alarms/acknowledgements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alarmId: alarm.alarmId, deviceId: alarm.deviceId }),
-      })
-      if (!response.ok) {
-        const problem = await response.json().catch(() => null) as { detail?: string; title?: string } | null
-        throw new Error(problem?.detail ?? problem?.title ?? `Acknowledgement failed: ${response.status}`)
+      for (const alarm of pendingRows) {
+        try {
+          const response = await sessionFetch('/alarms/acknowledgements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alarmId: alarm.alarmId, deviceId: alarm.deviceId }),
+          })
+          if (!response.ok) {
+            const problem = await response.json().catch(() => null) as { detail?: string; title?: string } | null
+            throw new Error(problem?.detail ?? problem?.title ?? `Acknowledgement failed: ${response.status}`)
+          }
+
+          const acknowledgement = await response.json() as AlarmAcknowledgement
+          succeeded.add(alarm.alarmId)
+          setAlarms((current) => current.map((item) => item.alarmId === acknowledgement.alarmId
+            ? {
+              ...item,
+              acknowledgedByOperatorId: acknowledgement.operatorId,
+              acknowledgedByOperator: acknowledgement.operatorName,
+              acknowledgedAtUtc: acknowledgement.acknowledgedAtUtc,
+            }
+            : item))
+        } catch (error) {
+          firstError ||= error instanceof Error ? error.message : 'Alarm acknowledgement failed.'
+        }
       }
 
-      const acknowledgement = await response.json() as AlarmAcknowledgement
-      setAlarms((current) => current.map((item) => item.alarmId === acknowledgement.alarmId
-        ? {
-          ...item,
-          acknowledgedByOperatorId: acknowledgement.operatorId,
-          acknowledgedByOperator: acknowledgement.operatorName,
-          acknowledgedAtUtc: acknowledgement.acknowledgedAtUtc,
-        }
-        : item))
-    } catch (error) {
-      console.error('Could not acknowledge alarm', error)
-      setAlarmError(error instanceof Error ? error.message : 'Alarm acknowledgement failed.')
+      if (succeeded.size > 0) {
+        const alarm = pendingRows[0]
+        showToast({
+          deviceName: bulk ? 'Alarm acknowledgement' : devices.find((device) => device.id === alarm.deviceId)?.name ?? alarm.deviceId,
+          kind: 'success',
+          text: bulk
+            ? `Acknowledged ${succeeded.size} of ${pendingRows.length} selected alarm groups.`
+            : `Alarm acknowledged (${alarm.code}).`,
+        })
+        setSelectedAlarmIds((current) => new Set([...current].filter((id) => !succeeded.has(id))))
+        await refreshAlarmHistory()
+      }
+      if (firstError) {
+        const failed = pendingRows.length - succeeded.size
+        setAlarmError(bulk ? `${failed} of ${pendingRows.length} selected alarms could not be acknowledged. ${firstError}` : firstError)
+      }
     } finally {
-      setAcknowledgingAlarmIds((current) => {
+      setAcknowledgingAlarmGroups((current) => {
         const next = new Set(current)
-        next.delete(alarm.alarmId)
+        for (const group of groups) next.delete(group)
         return next
       })
+      if (bulk) setBulkAcknowledging(false)
     }
   }
 
@@ -559,6 +653,109 @@ export default function Page() {
     }
   }
 
+  function renderAlarmTable(rows: AlarmEvent[], locallyDismissed = false) {
+    const label = locallyDismissed ? 'Locally dismissed alarms' : 'Alarm history'
+    const showSelection = canOperate && !locallyDismissed && alarmFilter !== 'acknowledged'
+    const pageSize = 10
+    const pageCount = Math.ceil(rows.length / pageSize)
+    const page = Math.min(locallyDismissed ? dismissedAlarmPage : alarmPage, pageCount)
+    const setPage = locallyDismissed ? setDismissedAlarmPage : setAlarmPage
+    const start = (page - 1) * pageSize
+    const pageRows = rows.slice(start, start + pageSize)
+
+    return <>
+      <div className="alarm-table-scroll" role="region" aria-label={label} tabIndex={0}>
+        <table className="alarm-table" aria-label={label}>
+          <colgroup>
+            {showSelection && <col className="alarm-selection-col" />}
+            <col className="alarm-equipment-col" />
+            <col />
+            <col className="alarm-severity-col" />
+            <col className="alarm-status-col" />
+            <col className="alarm-time-col" />
+            <col className="alarm-actions-col" />
+          </colgroup>
+          <thead>
+            <tr>
+              {showSelection && <th scope="col"><span className="sr-only">Selection</span></th>}
+              <th scope="col">Equipment</th>
+              <th scope="col">Alarm</th>
+              <th scope="col">Severity</th>
+              <th scope="col">Status</th>
+              <th scope="col">Time</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>{pageRows.map((alarm) => {
+            const acknowledged = !!alarm.acknowledgedAtUtc
+            return <tr className="alarm-row" key={alarm.alarmId} data-severity={alarm.severity.trim().toLowerCase()}>
+              {showSelection && <td>{!acknowledged && <input type="checkbox"
+                className="alarm-checkbox"
+                aria-label={`Select ${alarm.code} for ${alarm.deviceId}`}
+                checked={selectedAlarmIds.has(alarm.alarmId)}
+                disabled={bulkAcknowledging || acknowledgingAlarmGroups.has(alarmGroupKey(alarm))}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked
+                  setSelectedAlarmIds((current) => {
+                    const next = new Set(current)
+                    if (checked) next.add(alarm.alarmId)
+                    else next.delete(alarm.alarmId)
+                    return next
+                  })
+                }}
+              />}</td>}
+              <th scope="row">{devices.find((device) => device.id === alarm.deviceId)?.name || alarm.deviceId}</th>
+              <td className="alarm-message">{alarm.text}<span className="alarm-code">{alarm.code}</span></td>
+              <td><span className="alarm-severity">{alarm.severity}</span></td>
+              <td>
+                <div className="alarm-status">
+                  {locallyDismissed && <span className="alarm-state locally-dismissed-state">Dismissed locally</span>}
+                  {(acknowledged || !locallyDismissed) && <span className={`alarm-state ${acknowledged ? 'acknowledged' : alarm.isActive ? 'active' : ''}`}>
+                    {acknowledged ? 'Acknowledged' : alarm.isActive ? 'Active' : 'Cleared'}
+                  </span>}
+                  {acknowledged && <span className="alarm-operator">{alarm.acknowledgedByOperator ?? alarm.acknowledgedByOperatorId}</span>}
+                </div>
+              </td>
+              <td><time dateTime={alarm.timestamp}>{new Date(alarm.timestamp).toLocaleTimeString()}</time></td>
+              <td>
+                <div className="alarm-actions">
+                  {!acknowledged && canOperate && <button
+                    disabled={bulkAcknowledging || acknowledgingAlarmGroups.has(alarmGroupKey(alarm))}
+                    onClick={() => void acknowledgeAlarms([alarm])}
+                    className="ack"
+                    aria-label={`Acknowledge ${alarm.code} for ${alarm.deviceId}`}
+                  >{acknowledgingAlarmGroups.has(alarmGroupKey(alarm)) ? 'Acknowledging…' : 'Acknowledge'}</button>}
+                  <button className="ack"
+                    aria-label={`${locallyDismissed ? 'Restore' : 'Dismiss locally'} ${alarm.code} for ${alarm.deviceId}`}
+                    onClick={() => {
+                      if (pageRows.length === 1 && page > 1) setPage(page - 1)
+                      if (!locallyDismissed && selectedAlarmIds.has(alarm.alarmId)) {
+                        setSelectedAlarmIds((current) => new Set([...current].filter((id) => id !== alarm.alarmId)))
+                      }
+                      setLocallyDismissedAlarmIds((current) => {
+                        const next = new Set(current)
+                        if (locallyDismissed) next.delete(alarm.alarmId)
+                        else next.add(alarm.alarmId)
+                        return next
+                      })
+                    }}
+                  >{locallyDismissed ? 'Restore' : 'Dismiss locally'}</button>
+                </div>
+              </td>
+            </tr>
+          })}</tbody>
+        </table>
+      </div>
+      {pageCount > 1 && <nav className="alarm-pagination" aria-label={`${label} pagination`}>
+        <span role="status">Showing {start + 1}–{start + pageRows.length} of {rows.length} · Page {page} of {pageCount}</span>
+        <div className="alarm-pagination-buttons">
+          <button type="button" className="ack" disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</button>
+          <button type="button" className="ack" disabled={page === pageCount} onClick={() => setPage(page + 1)}>Next</button>
+        </div>
+      </nav>}
+    </>
+  }
+
   return <main id="overview" tabIndex={-1} className="app-shell" onKeyDown={(event) => {
     if (menuOpen && event.key === 'Escape') closeMenu()
   }}>
@@ -584,14 +781,17 @@ export default function Page() {
         <section className="kpi-row" aria-label="Equipment summary">
           <div className="kpi"><span className="kpi-icon"><Layers3 /></span><div><b>{inventoryStatus === 'ready' || devices.length ? devices.length : '—'}</b><small>Registered equipment</small></div></div>
           <div className="kpi"><span className="kpi-icon"><Fan /></span><div><b>{connected && inventoryStatus === 'ready' ? devices.filter(isRunning).length : '—'}</b><small>Equipment running</small></div></div>
-          <div className="kpi"><span className="kpi-icon"><AlertTriangle /></span><div><b>{alarms.length}</b><small>Recent alarms</small></div></div>
+          <div className="kpi"><span className="kpi-icon"><AlertTriangle /></span><div><b>{alarms.length}</b><small>Recorded alarms</small></div></div>
         </section>
         <div className={`dashboard-grid ${selected ? '' : 'without-selection'}`}>
           <section id="equipment" tabIndex={-1} className="equipment-section" aria-labelledby="equipment-title">
             <div className="section-title"><h2 id="equipment-title">Equipment</h2></div>
             {inventoryStatus === 'error' && <div className="inventory-message"><p role="status">Equipment inventory could not be loaded.</p><button className="sign-out" onClick={() => { setInventoryStatus('loading'); setInventoryAttempt((value) => value + 1) }}>Retry</button></div>}
             {!devices.length && inventoryStatus !== 'error' && <p className="inventory-message" role="status">{inventoryStatus === 'loading' ? 'Loading equipment…' : 'No equipment is registered yet.'}</p>}
-            {!!devices.length && <div className="devices-grid">{devices.map((device) => <DeviceCard key={device.id} device={device} selected={device.id === selected?.id} running={isRunning(device)} connected={connected} onSelect={() => selectDevice(device.id)} />)}</div>}
+            {!!devices.length && <div className="devices-grid">{devices.map((device) => <DeviceCard
+              key={device.id} device={device} selected={device.id === selected?.id} running={isRunning(device)}
+              connected={connected} hasCriticalAlarm={criticalDeviceIds.has(device.id)} onSelect={() => selectDevice(device.id)}
+            />)}</div>}
           </section>
           {selected && <DetailPanel device={selected} connected={connected}>
             {!canOperate ? <p className="command-feedback">Viewer access · Monitoring only</p> : capabilityStatus === 'ready'
@@ -602,81 +802,66 @@ export default function Page() {
         </div>
         <section id="alarms" tabIndex={-1} className="info-panel">
           <div className="panel-title">
-            <h2><AlertTriangle size={20} /> Recent alarms</h2>
+            <div className="alarm-title-row">
+              <h2><AlertTriangle size={20} /> Alarm history</h2>
+              <button type="button" className="ack alarm-sound-toggle"
+                aria-label={soundEnabled ? 'Mute alarm sound' : 'Enable alarm sound'}
+                title={soundEnabled ? 'Mute alarm sound' : 'Enable alarm sound'}
+                onClick={() => void toggleAlarmSound()}>
+                {soundEnabled ? <Volume2 size={16} aria-hidden="true" /> : <VolumeX size={16} aria-hidden="true" />}
+              </button>
+            </div>
             <span className="alarm-counts">
-              {alarms.filter((alarm) => alarm.isActive && !alarm.acknowledgedAtUtc).length} active · {alarms.filter((alarm) => !!alarm.acknowledgedAtUtc).length} acknowledged · {locallyDismissedAlarms.length} dismissed locally
+              {alarmTableRows.filter((alarm) => alarm.isActive && !alarm.acknowledgedAtUtc).length} active · {alarms.filter((alarm) => !!alarm.acknowledgedAtUtc).length} acknowledged · {locallyDismissedAlarms.length} dismissed locally
             </span>
           </div>
+          <div className="alarm-toolbar">
+            <div className="alarm-filters">
+              <label className="alarm-filter">Status
+                <select value={alarmFilter} onChange={(event) => {
+                  setAlarmFilter(event.currentTarget.value as typeof alarmFilter)
+                  resetAlarmSelection()
+                }}>
+                  <option value="all">All statuses</option>
+                  <option value="unacknowledged">Unacknowledged</option>
+                  <option value="acknowledged">Acknowledged</option>
+                </select>
+              </label>
+              <label className="alarm-filter">Device
+                <select value={alarmDeviceFilter} onChange={(event) => {
+                  setAlarmDeviceFilter(event.currentTarget.value)
+                  resetAlarmSelection()
+                }}>
+                  <option value="">All devices</option>
+                  {alarmDeviceOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                </select>
+              </label>
+            </div>
+            {canOperate && alarmFilter !== 'acknowledged' && <div className="alarm-bulk-actions">
+              <button type="button" className="ack" disabled={bulkAcknowledging || selectableAlarms.length === 0}
+                onClick={() => setSelectedAlarmIds(allAlarmsSelected ? new Set() : new Set(selectableAlarms.map((alarm) => alarm.alarmId)))}
+              >{allAlarmsSelected ? 'Clear selection' : `Select all (${selectableAlarms.length})`}</button>
+              <button type="button" className="ack alarm-bulk-submit"
+                disabled={bulkAcknowledging || acknowledgingAlarmGroups.size > 0 || selectedAlarms.length === 0}
+                onClick={() => void acknowledgeAlarms(selectedAlarms, true)}
+              >{bulkAcknowledging ? 'Acknowledging…' : `Acknowledge selected (${selectedAlarms.length})`}</button>
+            </div>}
+          </div>
+          {soundError && <p className="alarm-error" role="alert">{soundError}</p>}
           {alarmError && <p className="alarm-error" role="alert">{alarmError}</p>}
           {visibleAlarms.length === 0 ? (
-            <p className="alarm-empty">{alarms.length === 0 ? (connected ? 'No recent alarms.' : 'No recent alarms to display. Live monitoring is disconnected.') : 'All recent alarms were dismissed locally.'}</p>
-          ) : <ul className="alarm-list">{visibleAlarms.map((alarm) => (
-            <li className="alarm-row" key={alarm.alarmId} data-severity={alarm.severity.trim().toLowerCase()}>
-              <AlertTriangle className="alarm-icon" size={19} aria-hidden="true" />
-              <div className="alarm-details">
-                <div className="alarm-heading">
-                  <b>{devices.find((device) => device.id === alarm.deviceId)?.name || alarm.deviceId}</b>
-                  <span className="alarm-severity">{alarm.severity}</span>
-                  <span className={`alarm-state ${alarm.acknowledgedAtUtc ? 'acknowledged' : alarm.isActive ? 'active' : ''}`}>
-                    {alarm.acknowledgedAtUtc ? `Acknowledged by ${alarm.acknowledgedByOperator ?? alarm.acknowledgedByOperatorId}` : alarm.isActive ? 'Active' : 'Cleared'}
-                  </span>
-                </div>
-                <span className="alarm-message">{alarm.text} ({alarm.code})</span>
-              </div>
-              <time dateTime={alarm.timestamp}>{new Date(alarm.timestamp).toLocaleTimeString()}</time>
-              <div className="alarm-actions">
-                {!alarm.acknowledgedAtUtc && canOperate && <button
-                  disabled={acknowledgingAlarmIds.has(alarm.alarmId)}
-                  onClick={() => void acknowledgeAlarm(alarm)}
-                  className="ack"
-                  aria-label={`Acknowledge ${alarm.code} for ${alarm.deviceId}`}
-                >{acknowledgingAlarmIds.has(alarm.alarmId) ? 'Acknowledging…' : 'Acknowledge'}</button>}
-                <button
-                  onClick={() => setLocallyDismissedAlarmIds((current) => new Set(current).add(alarm.alarmId))}
-                  className="ack"
-                  aria-label={`Dismiss ${alarm.code} locally for ${alarm.deviceId}`}
-                >Dismiss locally</button>
-              </div>
-            </li>
-          ))}</ul>}
-          {locallyDismissedAlarms.length > 0 && <details className="locally-dismissed">
-            <summary>Locally dismissed alarms (not acknowledged)</summary>
-            <ul className="alarm-list">{locallyDismissedAlarms.map((alarm) => (
-              <li className="alarm-row" key={alarm.alarmId}>
-                <AlertTriangle className="alarm-icon" size={19} aria-hidden="true" />
-                <div className="alarm-details">
-                  <div className="alarm-heading">
-                    <b>{devices.find((device) => device.id === alarm.deviceId)?.name || alarm.deviceId}</b>
-                    <span className="alarm-state locally-dismissed-state">Dismissed locally</span>
-                    {alarm.acknowledgedAtUtc && <span className="alarm-state acknowledged">Acknowledged by {alarm.acknowledgedByOperator ?? alarm.acknowledgedByOperatorId}</span>}
-                  </div>
-                  <span className="alarm-message">{alarm.text} ({alarm.code})</span>
-                </div>
-                <time dateTime={alarm.timestamp}>{new Date(alarm.timestamp).toLocaleTimeString()}</time>
-                <div className="alarm-actions">
-                  {!alarm.acknowledgedAtUtc && canOperate && <button
-                    disabled={acknowledgingAlarmIds.has(alarm.alarmId)}
-                    onClick={() => void acknowledgeAlarm(alarm)}
-                    className="ack"
-                    aria-label={`Acknowledge ${alarm.code} for ${alarm.deviceId}`}
-                  >{acknowledgingAlarmIds.has(alarm.alarmId) ? 'Acknowledging…' : 'Acknowledge'}</button>}
-                  <button
-                    onClick={() => setLocallyDismissedAlarmIds((current) => {
-                      const next = new Set(current)
-                      next.delete(alarm.alarmId)
-                      return next
-                    })}
-                    className="ack"
-                    aria-label={`Restore ${alarm.code} for ${alarm.deviceId}`}
-                  >Restore</button>
-                </div>
-              </li>
-            ))}</ul>
+            <p className="alarm-empty">{alarms.length === 0 ? (connected ? 'No alarms recorded.' : 'No alarms to display. Live monitoring is disconnected.') : 'All alarms were dismissed locally.'}</p>
+          ) : filteredAlarms.length === 0 ? (
+            <p className="alarm-empty">No alarms match these filters.</p>
+          ) : renderAlarmTable(filteredAlarms)}
+          {filteredDismissedAlarms.length > 0 && <details className="locally-dismissed">
+            <summary>Locally dismissed alarms</summary>
+            {renderAlarmTable(filteredDismissedAlarms, true)}
           </details>}
         </section>
       </div>
     </section>
-    <CommandToasts toasts={toasts} onDismiss={dismissToast} />
+    <CommandToasts toasts={toasts} onDismiss={dismissToast} onDismissAll={dismissAllToasts} />
     {canCreate && <CreateDeviceDialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} onCreated={handleCreated} />}
   </main>
 }
