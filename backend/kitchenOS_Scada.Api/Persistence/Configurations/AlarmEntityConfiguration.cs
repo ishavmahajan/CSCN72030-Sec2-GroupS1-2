@@ -51,7 +51,7 @@ internal sealed class AlarmEntityConfiguration : IEntityTypeConfiguration<AlarmE
             .HasForeignKey(alarm => alarm.EventTypeId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(alarm => alarm.Device)
+        builder.HasOne<DeviceEntity>()
             .WithMany(device => device.Alarms)
             .HasForeignKey(alarm => alarm.DeviceId)
             .HasPrincipalKey(device => device.DeviceId)

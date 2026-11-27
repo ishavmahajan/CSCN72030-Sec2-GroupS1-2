@@ -113,17 +113,6 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
 .alarm-severity { padding: 2px 7px; border-radius: 5px; background: var(--severity-bg); color: var(--severity-text); font-size: 12px; font-weight: 700; text-transform: capitalize; }
 .alarm-message { display: block; margin-top: 3px; color: var(--muted); }
 .alarm-row time { color: var(--muted); white-space: nowrap; }
-.alarm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-.alarm-actions .ack { min-height: 34px; padding-inline: 9px; font-size: 12px; }
-.alarm-state { padding: 2px 7px; border-radius: 5px; background: #2d3035; color: #d4dae2; font-size: 11px; font-weight: 700; }
-.alarm-state.active { background: #482320; color: #ffb0a7; }
-.alarm-state.acknowledged { background: #203b2e; color: #a6e2bb; }
-.alarm-state.locally-dismissed-state { background: #3a3447; color: #d7c6ff; }
-.alarm-counts { color: var(--muted); font-size: 12px; }
-.alarm-error { margin: 8px 0; color: #ffb0a7; font-size: 13px; }
-.locally-dismissed { margin-top: 12px; color: var(--muted); font-size: 13px; }
-.locally-dismissed summary { cursor: pointer; }
-.locally-dismissed .alarm-row { color: #aeb6bf; }
 .spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
@@ -152,7 +141,7 @@ button:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
   .kpi-icon svg { width: 16px; }
   .alarm-row { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
   .alarm-row time { grid-column: 2; grid-row: 2; }
-  .alarm-row .alarm-actions { grid-column: 3; grid-row: 1 / span 2; flex-direction: column; }
+  .alarm-row .ack { grid-column: 3; grid-row: 1 / span 2; }
 }
 /* Setpoint modal */
 .setpoint-modal { width:min(100%,430px); color:#f1f3f5; border:1px solid #454b52; border-radius:14px; background:#17191c; box-shadow:0 24px 80px #00000099; }

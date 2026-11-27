@@ -1,11 +1,11 @@
-using kitchenOS_Scada.Api.Features.Alarms.Acknowledgement;
+using kitchenOS_Scada.Api.Notifier;
 using kitchenOS_Scada.Contract.Events;
 
 namespace kitchenOS_Scada.Api.Infrastructure.Bus;
 
-// Persists alarm events and forwards their generated IDs to connected clients.
+// Forwards alarm events from Redis to all currently connected API clients.
 public sealed class AlarmEventHandler(
-    IAlarmAcknowledgementService alarmAcknowledgementService) : IEventHandler
+    IClientNotifier clientNotifier) : IEventHandler
 {
     public string EventName => "alarm";
 
@@ -13,6 +13,7 @@ public sealed class AlarmEventHandler(
         EventEnvelope eventMessage,
         CancellationToken cancellationToken)
     {
-        return alarmAcknowledgementService.RecordAlarmAsync(eventMessage, cancellationToken);
+        // Keep notification cancellation tied to the message-bus callback.
+        return clientNotifier.Notify(eventMessage, cancellationToken);
     }
 }

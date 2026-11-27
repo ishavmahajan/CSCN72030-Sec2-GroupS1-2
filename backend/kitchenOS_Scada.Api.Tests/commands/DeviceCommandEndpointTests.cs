@@ -10,8 +10,6 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using kitchenOS.Simulator;
-using kitchenOS_Scada.Api.Features.Alarms.Acknowledgement;
-using kitchenOS_Scada.Api.Features.Alarms.Contracts;
 using kitchenOS_Scada.Api.Features.Devices;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Notifier;
@@ -239,7 +237,7 @@ public class DeviceCommandEndpointTests
         using RecordingSocket socket = new();
         notifier.AddClient(socket);
         using MessageBusService service = new(_bus,
-            new TelemetryEventHandler(notifier), new AlarmEventHandler(new RecordingAlarmService(notifier)),
+            new TelemetryEventHandler(notifier), new AlarmEventHandler(notifier),
             new CommandResultEventHandler(notifier), NullLogger<MessageBusService>.Instance);
         await service.StartAsync(_shutdown.Token);
         try
@@ -285,7 +283,7 @@ public class DeviceCommandEndpointTests
     {
         RecordingNotifier notifier = new();
         using MessageBusService service = new(_bus,
-            new TelemetryEventHandler(notifier), new AlarmEventHandler(new RecordingAlarmService(notifier)),
+            new TelemetryEventHandler(notifier), new AlarmEventHandler(notifier),
             new CommandResultEventHandler(notifier), NullLogger<MessageBusService>.Instance);
         await service.StartAsync(_shutdown.Token);
         try
@@ -388,26 +386,6 @@ public class DeviceCommandEndpointTests
             Messages.Add(Encoding.UTF8.GetString(buffer));
             return Task.CompletedTask;
         }
-    }
-
-    private sealed class RecordingAlarmService(IClientNotifier notifier)
-        : IAlarmAcknowledgementService
-    {
-        public Task<IReadOnlyList<AlarmStatusResponse>> GetRecentAsync(
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<AlarmAcknowledgementResult> AcknowledgeAsync(
-            AcknowledgeAlarmRequest request,
-            string operatorId,
-            string operatorName,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task RecordAlarmAsync(
-            EventEnvelope eventMessage,
-            CancellationToken cancellationToken) =>
-            notifier.Notify(eventMessage, cancellationToken);
     }
 }
 

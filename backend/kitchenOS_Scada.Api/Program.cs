@@ -5,7 +5,6 @@ using StackExchange.Redis;
 using kitchenOS_Scada.Api.Helpers;
 using kitchenOS_Scada.Api.Infrastructure.Bus;
 using kitchenOS_Scada.Api.Features.Devices;
-using kitchenOS_Scada.Api.Features.Alarms.Acknowledgement;
 using kitchenOS_Scada.Api.Persistence;
 using Microsoft.EntityFrameworkCore;
 using kitchenOS_Scada.Api.Security;
@@ -19,7 +18,6 @@ builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddKitchenOsSecurity(builder.Configuration);
 builder.Services.AddDeviceManagement();
-builder.Services.AddAlarmAcknowledgement();
 builder.Services.AddKitchenOsPersistence(builder.Configuration);
 
 // Queue commands for the separately hosted simulator through the message bus.
